@@ -17,6 +17,7 @@ type Service struct {
 	screenSize  string
 	fb          *FrameBuffer
 	output      io.Writer
+	display     bool
 }
 
 func NewService(path string, args []string, urlPrefix string, port int, shutdownURL string) (*Service, error) {
@@ -25,6 +26,7 @@ func NewService(path string, args []string, urlPrefix string, port int, shutdown
 		addr:        fmt.Sprintf("http://localhost:%d/%s", port, urlPrefix),
 		shutdownURL: shutdownURL,
 		cmd:         exec.Command(path, args...),
+		display:     false,
 	}
 	s.cmd.Env = os.Environ()
 	return s, nil
@@ -35,7 +37,8 @@ func (s *Service) SetOutput(w io.Writer, e io.Writer) {
 	s.cmd.Stderr = e
 }
 
-func (s *Service) SetDisplay(screenSize string) {
+func (s *Service) EnableDisplay(screenSize string) {
+	s.display = true
 	s.screenSize = screenSize
 }
 
@@ -47,7 +50,7 @@ func (s *Service) Display() (string, string) {
 }
 
 func (s *Service) Start() error {
-	if len(s.screenSize) > 0 {
+	if s.display {
 		s.fb = NewFrameBuffer(s.screenSize)
 		if err := s.fb.Start(); err != nil {
 			return err
