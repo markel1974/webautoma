@@ -1,6 +1,7 @@
 package service
 
 import (
+	"io"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -26,7 +27,9 @@ func NewSeleniumService(port int, base string, jarPath string, java string, geck
 	if htmlUnit != "" {
 		classpath = append(classpath, htmlUnit)
 	}
-	classpath = append(classpath, jarPath)
+	if len(jarPath) > 0 {
+		classpath = append(classpath, jarPath)
+	}
 	args = append(args, "-cp", strings.Join(classpath, ":"))
 	args = append(args, "org.openqa.grid.selenium.GridLauncherV3")
 	args = append(args, "-port", strconv.Itoa(port))
@@ -38,6 +41,32 @@ func NewSeleniumService(port int, base string, jarPath string, java string, geck
 	if err != nil {
 		return nil, err
 	}
-	sln := &SeleniumService{svc: svc}
-	return sln, nil
+	ss := &SeleniumService{svc: svc}
+	return ss, nil
+}
+
+func (ss *SeleniumService) SetOutput(w io.Writer) {
+	ss.svc.SetOutput(w)
+}
+
+func (ss *SeleniumService) SetDisplay(screenSize string) {
+	ss.svc.SetDisplay(screenSize)
+}
+
+func (ss *SeleniumService) Display() (string, string) {
+	return ss.svc.Display()
+}
+
+func (ss *SeleniumService) Start() error {
+	if err := ss.svc.Start(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ss *SeleniumService) Stop() error {
+	if err := ss.svc.Stop(); err != nil {
+		return err
+	}
+	return nil
 }

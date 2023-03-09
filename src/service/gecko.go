@@ -25,8 +25,16 @@ func NewGeckoService(path string, port int) (*GeckoService, error) {
 	return gs, nil
 }
 
-func (cs *GeckoService) SetOutput(w io.Writer) {
-	cs.svc.SetOutput(w)
+func (gs *GeckoService) SetDisplay(screenSize string) {
+	gs.svc.SetDisplay(screenSize)
+}
+
+func (gs *GeckoService) Display() (string, string) {
+	return gs.svc.Display()
+}
+
+func (gs *GeckoService) SetOutput(w io.Writer) {
+	gs.svc.SetOutput(w)
 }
 
 func (gs *GeckoService) Start() error {

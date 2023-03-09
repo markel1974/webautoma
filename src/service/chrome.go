@@ -30,6 +30,14 @@ func NewChromeService(path string, port int, base string, verbose bool) (*Chrome
 	return cs, nil
 }
 
+func (cs *ChromeService) SetDisplay(screenSize string) {
+	cs.svc.SetDisplay(screenSize)
+}
+
+func (cs *ChromeService) Display() (string, string) {
+	return cs.svc.Display()
+}
+
 func (cs *ChromeService) SetOutput(w io.Writer) {
 	cs.svc.SetOutput(w)
 }
