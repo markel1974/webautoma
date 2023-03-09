@@ -19,11 +19,12 @@ func main() {
 	var showHelp bool
 	var showVersion bool
 	var execFile string
-	var url string
+	var wdUrl string
+
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&execFile, "x", "", "exec file")
-	flag.StringVar(&url, "u", "http://127.0.0.1:9515", "url")
+	flag.StringVar(&wdUrl, "u", "http://127.0.0.1:9515", "web driver url")
 	flag.Parse()
 
 	if showHelp {
@@ -51,7 +52,7 @@ func main() {
 	caps := base.Capabilities{}
 	caps.SetLogLevel(logType, logLevel)
 	caps.SetChrome(chromeCaps)
-	driver := wd.NewWebDriver(caps, url)
+	driver := wd.NewWebDriver(caps, wdUrl)
 
 	if err := driver.Start(); err != nil {
 		log.Fatal(err.Error())
