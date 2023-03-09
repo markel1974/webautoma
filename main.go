@@ -1,7 +1,10 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/markel1974/webautoma/src/executor"
+	"github.com/markel1974/webautoma/src/version"
 	"github.com/markel1974/webautoma/src/wd"
 	"github.com/markel1974/webautoma/src/wd/base"
 	"github.com/markel1974/webautoma/src/wd/caps/chrome"
@@ -13,6 +16,23 @@ import (
 //go mod vendor
 
 func main() {
+	var showHelp bool
+	var showVersion bool
+
+	flag.BoolVar(&showHelp, "h", false, "show this help")
+	flag.BoolVar(&showVersion, "v", false, "show version")
+	flag.Parse()
+
+	if showHelp {
+		flag.Usage()
+		return
+	}
+
+	if showVersion {
+		fmt.Println(version.AppName, version.AppVersion)
+		return
+	}
+
 	chromeCaps := chrome.Caps{}
 	caps := base.Capabilities{}
 	exec := executor.New()
