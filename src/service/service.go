@@ -6,108 +6,48 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 	"time"
 )
 
-type ServiceOption func(*Service) error
-
-func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Service, error) {
-	s, err := newService(exec.Command("java"), "/wd/hub", port, opts...)
-	if err != nil {
-		return nil, err
-	}
-	if s.javaPath != "" {
-		s.cmd.Path = s.javaPath
-	}
-	if s.geckoDriverPath != "" {
-		s.cmd.Args = append([]string{"java", "-Dwebdriver.gecko.driver=" + s.geckoDriverPath}, s.cmd.Args[1:]...)
-	}
-	if s.chromeDriverPath != "" {
-		s.cmd.Args = append([]string{"java", "-Dwebdriver.chrome.driver=" + s.chromeDriverPath}, s.cmd.Args[1:]...)
-	}
-
-	var classpath []string
-	if s.htmlUnitPath != "" {
-		classpath = append(classpath, s.htmlUnitPath)
-	}
-	classpath = append(classpath, jarPath)
-	s.cmd.Args = append(s.cmd.Args, "-cp", strings.Join(classpath, ":"))
-	s.cmd.Args = append(s.cmd.Args, "org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port), "-debug")
-
-	if err := s.start(port); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func NewChromeDriverService(path string, port int, opts ...ServiceOption) (*Service, error) {
-	cmd := exec.Command(path, "--port="+strconv.Itoa(port), "--url-base=wd/hub", "--verbose")
-	s, err := newService(cmd, "/wd/hub", port, opts...)
-	if err != nil {
-		return nil, err
-	}
-	s.shutdownURLPath = "/shutdown"
-	if err := s.start(port); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func NewGeckoDriverService(path string, port int, opts ...ServiceOption) (*Service, error) {
-	cmd := exec.Command(path, "--port", strconv.Itoa(port))
-	s, err := newService(cmd, "", port, opts...)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.start(port); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-// Service controls a locally-running Selenium subprocess.
 type Service struct {
-	port                      int
-	addr                      string
-	cmd                       *exec.Cmd
-	shutdownURLPath           string
-	display                   string
-	xAuthPath                 string
-	xvfb                      *FrameBuffer
-	geckoDriverPath, javaPath string
-	chromeDriverPath          string
-	htmlUnitPath              string
-	output                    io.Writer
+	port            int
+	addr            string
+	cmd             *exec.Cmd
+	shutdownURLPath string
+	//display                   string
+	//xAuthPath                 string
+	//xvfb                      *FrameBuffer
+	output io.Writer
 }
 
-func newService(cmd *exec.Cmd, urlPrefix string, port int, opts ...ServiceOption) (*Service, error) {
+func NewService(cmd *exec.Cmd, urlPrefix string, port int, shutdownURLPath string) (*Service, error) {
 	s := &Service{
-		port: port,
-		addr: fmt.Sprintf("http://localhost:%d%s", port, urlPrefix),
+		port:            port,
+		addr:            fmt.Sprintf("http://localhost:%d/%s", port, urlPrefix),
+		shutdownURLPath: shutdownURLPath,
 	}
-	for _, opt := range opts {
-		if err := opt(s); err != nil {
-			return nil, err
-		}
-	}
-	cmd.Stderr = s.output
-	cmd.Stdout = s.output
+
 	cmd.Env = os.Environ()
-	// TODO(minusnine): Pdeathsig is only supported on Linux. Somehow, make sure
-	// process cleanup happens as gracefully as possible.
-	if s.display != "" {
-		cmd.Env = append(cmd.Env, "DISPLAY=:"+s.display)
-	}
-	if s.xAuthPath != "" {
-		cmd.Env = append(cmd.Env, "XAUTHORITY="+s.xAuthPath)
-	}
+
+	/*
+		// TODO: Pdeathsig is only supported on Linux. Somehow, make sure
+		// process cleanup happens as gracefully as possible.
+		if s.display != "" {
+			cmd.Env = append(cmd.Env, "DISPLAY=:"+s.display)
+		}
+		if s.xAuthPath != "" {
+			cmd.Env = append(cmd.Env, "XAUTHORITY="+s.xAuthPath)
+		}*/
 	s.cmd = cmd
 	return s, nil
 }
 
-func (s *Service) start(port int) error {
+func (s *Service) SetOutput(w io.Writer) {
+	s.cmd.Stderr = w
+	s.cmd.Stdout = w
+}
+
+func (s *Service) Start() error {
 	if err := s.cmd.Start(); err != nil {
 		return err
 	}
@@ -125,32 +65,13 @@ func (s *Service) start(port int) error {
 			}
 		}
 	}
-	return fmt.Errorf("server did not respond on port %d", port)
-}
-
-func (s *Service) SetOutput(w io.Writer) {
-	s.output = w
-}
-
-func (s *Service) SetGeckoDriver(path string) {
-	s.geckoDriverPath = path
-}
-
-func (s *Service) SetChromeDriver(path string) {
-	s.chromeDriverPath = path
-}
-
-func (s *Service) SetJavaPath(path string) {
-	s.javaPath = path
-}
-
-func (s *Service) SetHTMLUnit(path string) {
-	s.htmlUnitPath = path
+	return fmt.Errorf("server did not respond on port %d", s.port)
 }
 
 func (s *Service) Stop() error {
 	// Selenium 3 stopped supporting the shutdown URL by default.
 	// https://github.com/SeleniumHQ/selenium/issues/2852
+
 	if s.shutdownURLPath == "" {
 		if err := s.cmd.Process.Kill(); err != nil {
 			return err
@@ -162,15 +83,19 @@ func (s *Service) Stop() error {
 		}
 		_ = resp.Body.Close()
 	}
+
 	if err := s.cmd.Wait(); err != nil && err.Error() != "signal: killed" {
 		return err
 	}
-	if s.xvfb != nil {
-		return s.xvfb.Stop()
-	}
+	/*
+		if s.xvfb != nil {
+			return s.xvfb.Stop()
+		}
+	*/
 	return nil
 }
 
+/*
 func (s *Service) FrameBuffer() *FrameBuffer {
 	return s.xvfb
 }
@@ -224,3 +149,4 @@ func (s *Service) isDisplay(target string) bool {
 	}
 	return true
 }
+*/
