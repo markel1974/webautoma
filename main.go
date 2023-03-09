@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/markel1974/webautoma/src/executor"
+	"github.com/markel1974/webautoma/src/service"
 	"github.com/markel1974/webautoma/src/version"
 	"github.com/markel1974/webautoma/src/wd"
 	"github.com/markel1974/webautoma/src/wd/base"
@@ -19,12 +20,16 @@ func main() {
 	var showHelp bool
 	var showVersion bool
 	var execFile string
-	var wdUrl string
+	var baseUrl string
+	var port int
+	var webDriverPath string
 
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&execFile, "x", "", "exec file")
-	flag.StringVar(&wdUrl, "u", "http://127.0.0.1:9515", "web driver url")
+	flag.StringVar(&baseUrl, "b", "http://127.0.0.1", "web driver base url")
+	flag.IntVar(&port, "p", 9515, "web driver port")
+	flag.StringVar(&webDriverPath, "s", "", "web driver service path")
 	flag.Parse()
 
 	if showHelp {
@@ -47,6 +52,18 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	logType, logLevel := exec.RequiredLogs()
+
+	if len(webDriverPath) > 0 {
+		svc, err := service.NewChromeService(webDriverPath, port, "", true)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		if err := svc.Start(); err != nil {
+			log.Fatal(err.Error())
+		}
+	}
+
+	wdUrl := fmt.Sprintf("%s:%d", baseUrl, port)
 
 	chromeCaps := chrome.Caps{}
 	caps := base.Capabilities{}
