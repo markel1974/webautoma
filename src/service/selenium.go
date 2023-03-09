@@ -28,7 +28,9 @@ func NewSeleniumService(port int, base string, jarPath string, java string, geck
 	if len(jarPath) > 0 {
 		classpath = append(classpath, jarPath)
 	}
-	args = append(args, "-cp", strings.Join(classpath, ":"))
+	if len(classpath) > 0 {
+		args = append(args, "-cp", strings.Join(classpath, ":"))
+	}
 	args = append(args, "org.openqa.grid.selenium.GridLauncherV3")
 	args = append(args, "-port", strconv.Itoa(port))
 	if debug {
