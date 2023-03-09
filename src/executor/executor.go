@@ -44,6 +44,7 @@ type Executor struct {
 
 func New(fileName string) (*Executor, error) {
 	e := &Executor{
+		driver:              nil,
 		fileId:              computeFileId(fileName),
 		quit:                false,
 		retryInterval:       1000,
