@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"regexp"
@@ -20,8 +21,6 @@ const RFC3339Milli = "2006-01-02T15:04:05.000Z07:00"
 
 type Executor struct {
 	driver              base.IWebDriver
-	fileName            string
-	fileData            []byte
 	fileId              string
 	start               time.Time
 	wait                int
@@ -43,54 +42,43 @@ type Executor struct {
 	cfg                 Config
 }
 
-func New() *Executor {
-	e := &Executor{}
-	//e.driver = vars.getObject('driver');
-	//e.actions = vars.getObject('actions');
-	//e.filename = vars.getObject('filename');
-	//e.filedata = vars.getObject('filedata');
-	//e.imageAdapter = vars.getObject('imageAdapter');
-	//e.sidecarWriter = vars.getObject('sidecarWriter');
-	//e.keys = JavaImporter(org.openqa.selenium.Keys);
-	//e.logPkg = JavaImporter(org.openqa.selenium.logging);
-	e.retryInterval = 1000
-	e.humanWaitBase = 150
-	e.uuid = uuid.New().String()
-	e.useHtmlEncoding = true
-	e.bid = ""
-	e.maxScreenshotLength = 0
-	e.errorDisabled = false
-	e.debug = false
-	e.maxRetry = 3
-	e.timers = make(map[string]*Timer)
-	e.probeId = ""
-	e.networkFilter = regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)")
-	return e
-}
-
-func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
-	return base.LogPerformance, base.LogAll
-}
-
-func (e *Executor) Setup(driver base.IWebDriver, fileName string) error {
-	e.driver = driver
-	e.fileName = fileName
-	e.fileId = e.computeFileId(e.fileName)
-	e.fileData = []byte(stub)
-	if err := json.Unmarshal(e.fileData, &e.cfg); err != nil {
-		return err
+func New(fileName string) (*Executor, error) {
+	e := &Executor{
+		fileId:              computeFileId(fileName),
+		quit:                false,
+		retryInterval:       1000,
+		humanWaitBase:       150,
+		wait:                60000,
+		uuid:                uuid.New().String(),
+		useHtmlEncoding:     true,
+		bid:                 "",
+		maxScreenshotLength: 0,
+		errorDisabled:       false,
+		debug:               false,
+		maxRetry:            3,
+		timers:              make(map[string]*Timer),
+		probeId:             "",
+		networkFilter:       regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
+	}
+	fileData, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(fileData, &e.cfg); err != nil {
+		return nil, err
 	}
 	if e.cfg.Timeout != nil {
 		e.wait = *e.cfg.Timeout
-	} else {
-		e.wait = 60000
 	}
 	if e.cfg.Quit != nil {
 		e.quit = *e.cfg.Quit
-	} else {
-		e.quit = false
 	}
-	return nil
+	return e, nil
+}
+
+func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
+	//TODO FROM CONFIG
+	return base.LogPerformance, base.LogAll
 }
 
 func (e *Executor) createEvent(id string, kind string, err error, start time.Time, dur int64, shot bool) map[string]interface{} {
@@ -189,23 +177,6 @@ func (e *Executor) humanWait() {
 	val := math.Round(rnd * 100)
 	interval := e.humanWaitBase + int(val)
 	e.doSleep(interval)
-}
-
-func (e *Executor) computeFileId(filename string) string {
-	var pos = strings.LastIndex(filename, "\\")
-	if pos < 0 {
-		pos = strings.LastIndex(filename, "/")
-	}
-	if pos < 0 {
-		pos = 0
-	} else {
-		pos++
-	}
-	name := filename[pos:]
-	if pos := strings.LastIndex(name, "."); pos >= 0 {
-		name = name[0:pos]
-	}
-	return name
 }
 
 func (e *Executor) getNetworkLogs() (map[string]interface{}, int) {
@@ -728,9 +699,9 @@ func (e *Executor) finalize(err error) {
 	}
 }
 
-func (e *Executor) Run() error {
+func (e *Executor) Start(driver base.IWebDriver) error {
 	var err error
-
+	e.driver = driver
 	e.start = time.Now()
 
 	//WDS.sampleResult.sampleStart()
@@ -768,4 +739,21 @@ func (e *Executor) Run() error {
 func parseInt(in string) int {
 	out, _ := strconv.Atoi(in)
 	return out
+}
+
+func computeFileId(filename string) string {
+	var pos = strings.LastIndex(filename, "\\")
+	if pos < 0 {
+		pos = strings.LastIndex(filename, "/")
+	}
+	if pos < 0 {
+		pos = 0
+	} else {
+		pos++
+	}
+	name := filename[pos:]
+	if pos := strings.LastIndex(name, "."); pos >= 0 {
+		name = name[0:pos]
+	}
+	return name
 }

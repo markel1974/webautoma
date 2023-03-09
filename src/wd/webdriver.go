@@ -162,7 +162,7 @@ func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, 
 	return buf, nil
 }
 
-func NewWebDriver(capabilities base.Capabilities, urlPrefix string) (*WebDriver, error) {
+func NewWebDriver(capabilities base.Capabilities, urlPrefix string) *WebDriver {
 	if urlPrefix == "" {
 		urlPrefix = DefaultURLPrefix
 	}
@@ -174,10 +174,14 @@ func NewWebDriver(capabilities base.Capabilities, urlPrefix string) (*WebDriver,
 	if b := capabilities["browserName"]; b != nil {
 		wd.browser = b.(string)
 	}
+	return wd
+}
+
+func (wd *WebDriver) Start() error {
 	if _, err := wd.NewSession(); err != nil {
-		return nil, err
+		return err
 	}
-	return wd, nil
+	return nil
 }
 
 // DeleteSession deletes an existing session at the WebDriver instance

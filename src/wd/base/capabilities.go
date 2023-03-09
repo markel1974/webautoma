@@ -7,20 +7,20 @@ import (
 
 type Capabilities map[string]interface{}
 
-func (c Capabilities) AddChrome(f chrome.Caps) {
+func (c Capabilities) SetChrome(f chrome.Caps) {
 	c[chrome.CapabilitiesKey] = f
 	c[chrome.DeprecatedCapabilitiesKey] = f
 }
 
-func (c Capabilities) AddFirefox(f firefox.Caps) {
+func (c Capabilities) SetFirefox(f firefox.Caps) {
 	c[firefox.CapabilitiesKey] = f
 }
 
-func (c Capabilities) AddProxy(p Proxy) {
+func (c Capabilities) SetProxy(p Proxy) {
 	c["proxy"] = p
 }
 
-func (c Capabilities) AddLogging(l LogActions) {
+func (c Capabilities) SetLogging(l LogActions) {
 	c[LogCapabilitiesKey] = l
 }
 

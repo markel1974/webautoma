@@ -18,9 +18,12 @@ import (
 func main() {
 	var showHelp bool
 	var showVersion bool
-
+	var execFile string
+	var url string
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
+	flag.StringVar(&execFile, "x", "", "exec file")
+	flag.StringVar(&url, "u", "http://127.0.0.1:9515", "url")
 	flag.Parse()
 
 	if showHelp {
@@ -33,23 +36,28 @@ func main() {
 		return
 	}
 
-	chromeCaps := chrome.Caps{}
-	caps := base.Capabilities{}
-	exec := executor.New()
+	if len(execFile) == 0 {
+		log.Fatal("empty exec file")
+		return
+	}
 
-	logType, logLevel := exec.RequiredLogs()
-	caps.SetLogLevel(logType, logLevel)
-	caps.AddChrome(chromeCaps)
-	driver, err := wd.NewWebDriver(caps, "http://127.0.0.1:9515")
+	exec, err := executor.New(execFile)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	logType, logLevel := exec.RequiredLogs()
 
-	if err := exec.Setup(driver, "test"); err != nil {
+	chromeCaps := chrome.Caps{}
+	caps := base.Capabilities{}
+	caps.SetLogLevel(logType, logLevel)
+	caps.SetChrome(chromeCaps)
+	driver := wd.NewWebDriver(caps, url)
+
+	if err := driver.Start(); err != nil {
 		log.Fatal(err.Error())
 	}
 
-	if err := exec.Run(); err != nil {
+	if err := exec.Start(driver); err != nil {
 		log.Fatal(err.Error())
 	}
 
