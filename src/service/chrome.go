@@ -1,13 +1,11 @@
 package service
 
 import (
-	"io"
-	"os/exec"
 	"strconv"
 )
 
 type ChromeService struct {
-	svc *Service
+	*Service
 }
 
 func NewChromeService(path string, port int, base string, verbose bool) (*ChromeService, error) {
@@ -19,39 +17,12 @@ func NewChromeService(path string, port int, base string, verbose bool) (*Chrome
 	if verbose {
 		args = append(args, "--verbose")
 	}
-	cmd := exec.Command(path, args...)
-	svc, err := NewService(cmd, base, port, "/shutdown")
+	svc, err := NewService(path, args, base, port, "/shutdown")
 	if err != nil {
 		return nil, err
 	}
 	cs := &ChromeService{
-		svc: svc,
+		Service: svc,
 	}
 	return cs, nil
-}
-
-func (cs *ChromeService) SetDisplay(screenSize string) {
-	cs.svc.SetDisplay(screenSize)
-}
-
-func (cs *ChromeService) Display() (string, string) {
-	return cs.svc.Display()
-}
-
-func (cs *ChromeService) SetOutput(w io.Writer) {
-	cs.svc.SetOutput(w)
-}
-
-func (cs *ChromeService) Start() error {
-	if err := cs.svc.Start(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (cs *ChromeService) Stop() error {
-	if err := cs.svc.Stop(); err != nil {
-		return err
-	}
-	return nil
 }

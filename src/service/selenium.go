@@ -1,14 +1,12 @@
 package service
 
 import (
-	"io"
-	"os/exec"
 	"strconv"
 	"strings"
 )
 
 type SeleniumService struct {
-	svc *Service
+	*Service
 }
 
 func NewSeleniumService(port int, base string, jarPath string, java string, gecko string, chrome string, htmlUnit string, debug bool) (*SeleniumService, error) {
@@ -36,37 +34,12 @@ func NewSeleniumService(port int, base string, jarPath string, java string, geck
 	if debug {
 		args = append(args, "-debug")
 	}
-	cmd := exec.Command(path, args...)
-	svc, err := NewService(cmd, base, port, "")
+	svc, err := NewService(path, args, base, port, "")
 	if err != nil {
 		return nil, err
 	}
-	ss := &SeleniumService{svc: svc}
+	ss := &SeleniumService{
+		Service: svc,
+	}
 	return ss, nil
-}
-
-func (ss *SeleniumService) SetOutput(w io.Writer) {
-	ss.svc.SetOutput(w)
-}
-
-func (ss *SeleniumService) SetDisplay(screenSize string) {
-	ss.svc.SetDisplay(screenSize)
-}
-
-func (ss *SeleniumService) Display() (string, string) {
-	return ss.svc.Display()
-}
-
-func (ss *SeleniumService) Start() error {
-	if err := ss.svc.Start(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ss *SeleniumService) Stop() error {
-	if err := ss.svc.Stop(); err != nil {
-		return err
-	}
-	return nil
 }

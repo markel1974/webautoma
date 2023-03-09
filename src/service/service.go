@@ -19,20 +19,20 @@ type Service struct {
 	output      io.Writer
 }
 
-func NewService(cmd *exec.Cmd, urlPrefix string, port int, shutdownURL string) (*Service, error) {
+func NewService(path string, args []string, urlPrefix string, port int, shutdownURL string) (*Service, error) {
 	s := &Service{
 		port:        port,
 		addr:        fmt.Sprintf("http://localhost:%d/%s", port, urlPrefix),
 		shutdownURL: shutdownURL,
+		cmd:         exec.Command(path, args...),
 	}
-	cmd.Env = os.Environ()
-	s.cmd = cmd
+	s.cmd.Env = os.Environ()
 	return s, nil
 }
 
-func (s *Service) SetOutput(w io.Writer) {
-	s.cmd.Stderr = w
+func (s *Service) SetOutput(w io.Writer, e io.Writer) {
 	s.cmd.Stdout = w
+	s.cmd.Stderr = e
 }
 
 func (s *Service) SetDisplay(screenSize string) {

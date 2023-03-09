@@ -13,12 +13,9 @@ import (
 )
 
 type FrameBuffer struct {
-	display string
-
-	authPath string
-
-	cmd *exec.Cmd
-
+	display    string
+	authPath   string
+	cmd        *exec.Cmd
 	screenSize string
 }
 
