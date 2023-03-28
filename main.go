@@ -23,6 +23,9 @@ func main() {
 	var baseUrl string
 	var port int
 	var webDriverPath string
+	var startWebDriverOnly bool
+	var logFile string
+	var imgFile string
 
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
@@ -30,6 +33,10 @@ func main() {
 	flag.StringVar(&baseUrl, "b", "http://127.0.0.1", "web driver base url")
 	flag.IntVar(&port, "p", 9515, "web driver port")
 	flag.StringVar(&webDriverPath, "s", "", "web driver service path")
+	flag.BoolVar(&startWebDriverOnly, "w", false, "start webdriver only")
+	flag.StringVar(&logFile, "l", "log.json", "default log file")
+	flag.StringVar(&imgFile, "i", "images.json", "default image file")
+	//images.log
 	flag.Parse()
 
 	if showHelp {
@@ -42,26 +49,37 @@ func main() {
 		return
 	}
 
-	if len(execFile) == 0 {
-		log.Fatal("empty exec file")
-		return
-	}
-
-	exec, err := executor.New(execFile)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	logType, logLevel := exec.RequiredLogs()
-
 	if len(webDriverPath) > 0 {
-		svc, err := service.NewChromeService(webDriverPath, port, "", true)
+		svc, err := service.NewChromeService(webDriverPath, port, baseUrl, true)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 		if err := svc.Start(); err != nil {
 			log.Fatal(err.Error())
 		}
+		if startWebDriverOnly {
+			return
+		}
 	}
+
+	if len(execFile) == 0 {
+		log.Fatal("empty exec file")
+		return
+	}
+
+	if len(logFile) == 0 {
+		logFile = "log.json"
+	}
+
+	if len(imgFile) == 0 {
+		imgFile = "images.json"
+	}
+
+	exec, err := executor.New(execFile, logFile, imgFile)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	logType, logLevel := exec.RequiredLogs()
 
 	wdUrl := fmt.Sprintf("%s:%d", baseUrl, port)
 

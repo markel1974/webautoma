@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,6 +21,8 @@ import (
 const RFC3339Milli = "2006-01-02T15:04:05.000Z07:00"
 
 type Executor struct {
+	logFile             string
+	imgFile             string
 	driver              base.IWebDriver
 	fileId              string
 	start               time.Time
@@ -42,8 +45,10 @@ type Executor struct {
 	cfg                 Config
 }
 
-func New(fileName string) (*Executor, error) {
+func New(fileName string, logFile string, imgFile string) (*Executor, error) {
 	e := &Executor{
+		logFile:             logFile,
+		imgFile:             imgFile,
 		driver:              nil,
 		fileId:              computeFileId(fileName),
 		quit:                false,
@@ -82,72 +87,68 @@ func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
 	return base.LogPerformance, base.LogAll
 }
 
-func (e *Executor) createEvent(id string, kind string, err error, start time.Time, dur int64, shot bool) map[string]interface{} {
-	stop := time.Now()
-	networkLog, errorCount := e.getNetworkLogs()
-	errorDesc := ""
-	if err != nil {
-		errorDesc = err.Error()
-	}
-	event := map[string]interface{}{
-		"probeId":           e.probeId,
-		"thread_name":       id,
-		"transaction_type":  kind,
-		"timestamp":         time.Now().Format(RFC3339Milli),
-		"start":             start.Format(RFC3339Milli),
-		"stop":              stop.Format(RFC3339Milli),
-		"execution_time":    dur,
-		"uuid":              e.uuid,
-		"livello":           "INFO",
-		"error":             errorDesc,
-		"passed":            err == nil,
-		"business_id":       e.bid,
-		"network":           networkLog,
-		"networkErrorCount": errorCount,
-		"screenshotId":      nil,
-		"label":             nil,
-		"target":            nil,
-		"command":           nil,
-		"message":           nil,
-	}
-
+func (e *Executor) createEvent(id string, kind string, err error, start time.Time, dur int64, shot bool) *Event {
+	event := NewEvent(id, kind, err, start, dur)
+	event.ProbeId = e.probeId
+	event.UUID = e.uuid
+	event.BusinessId = e.bid
+	event.Network, event.NetworkErrorCount = e.getNetworkLogs()
 	if shot {
-		//480p = 858 x 480 - 720p = 1280 x 720 - 1080p = 1920 x 1080 — FullHD
-		screenshotId := "probes-" + uuid.New().String()
-		if screenshot, err := e.driver.Screenshot(); err == nil {
-			if scaled, err := Scale(screenshot, 1920, 1080); err == nil {
-				screenshotData := base64.StdEncoding.EncodeToString(scaled)
-				if e.useHtmlEncoding {
-					screenshotData = "data:image/png;base64," + screenshotData
-				}
-				if e.maxScreenshotLength > 0 {
-					if len(screenshotData) > e.maxScreenshotLength {
-						screenshotData = screenshotData[0:e.maxScreenshotLength]
-					}
-				}
-
-				imageEvent := map[string]interface{}{
-					"id":          screenshotId,
-					"length":      len(screenshotData),
-					"screenshot":  screenshotData,
-					"business_id": e.bid,
-				}
-				imageData, _ := json.Marshal(imageEvent)
-
-				//TODO WRITE PNG!!!!
-				fmt.Println("PNG DATA: ", string(imageData))
-				//e.sidecarWriter.Write("images.log", imageData)
-			}
-		}
-		event["screenshotId"] = screenshotId
+		event.ScreenShoot = "probes-" + uuid.New().String()
+		e.doScreenshot(event.ScreenShoot)
 	}
 	return event
 }
 
+func (e *Executor) doScreenshot(screenshotId string) {
+	//480p = 858 x 480 - 720p = 1280 x 720 - 1080p = 1920 x 1080 — FullHD
+	screenshot, err := e.driver.Screenshot()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	scaled, err := Scale(screenshot, 1920, 1080)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	screenshotData := base64.StdEncoding.EncodeToString(scaled)
+	if e.useHtmlEncoding {
+		screenshotData = "data:image/png;base64," + screenshotData
+	}
+	if e.maxScreenshotLength > 0 {
+		if len(screenshotData) > e.maxScreenshotLength {
+			screenshotData = screenshotData[0:e.maxScreenshotLength]
+		}
+	}
+	imageEvent := map[string]interface{}{
+		"id":          screenshotId,
+		"length":      len(screenshotData),
+		"screenshot":  screenshotData,
+		"business_id": e.bid,
+	}
+	imageData, _ := json.Marshal(imageEvent)
+	f, err := os.OpenFile(e.imgFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("error writing log file", err.Error())
+		return
+	}
+	_, _ = f.Write(imageData)
+	_, _ = f.Write([]byte("\n"))
+	_ = f.Sync()
+	f.Close()
+}
+
 func (e *Executor) doLog(message string) {
-	//TODO LOG
-	fmt.Println(message)
-	//WDS.log.info(message)
+	f, err := os.OpenFile(e.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("error writing log file", err.Error())
+		return
+	}
+	_, _ = f.Write([]byte(message))
+	_, _ = f.Write([]byte("\n"))
+	_ = f.Sync()
+	f.Close()
 }
 
 func (e *Executor) logDebug(message string) {
@@ -160,7 +161,7 @@ func (e *Executor) logInfo(message string) {
 	e.doLog(message)
 }
 
-func (e *Executor) logEvent(event map[string]interface{}) {
+func (e *Executor) logEvent(event *Event) {
 	message, err := json.Marshal(event)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -351,7 +352,7 @@ func (e *Executor) timerHandler(target string, until string, value string) error
 			start := t.Start
 			dur := t.Finalize()
 			event := e.createEvent(t.Id, "full", nil, start, dur, false)
-			event["message"] = "Esito sonda ok"
+			event.Message = "Esito sonda ok"
 			e.logEvent(event)
 			return nil
 		}
@@ -665,9 +666,9 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	}
 	var dur = time.Now().UnixMilli() - start.UnixMilli()
 	var event = e.createEvent(e.fileId, "intermediate", err, start, dur, err != nil)
-	event["label"] = id
-	event["target"] = target
-	event["command"] = command
+	event.Label = id
+	event.Target = target
+	event.Target = command
 	e.logEvent(event)
 
 	return err
@@ -679,7 +680,7 @@ func (e *Executor) finalize(err error) {
 			start := t.Start
 			dur := t.Finalize()
 			event := e.createEvent(t.Id, "full", nil, start, dur, false)
-			event["message"] = "timer not finalized"
+			event.Message = "timer not finalized"
 			e.logEvent(event)
 		}
 	}
@@ -687,9 +688,9 @@ func (e *Executor) finalize(err error) {
 	var dur = time.Now().UnixMilli() - e.start.UnixMilli()
 	var event = e.createEvent(e.fileId, "full", err, e.start, dur, false)
 	if err != nil {
-		event["message"] = "Errore nella sonda"
+		event.Message = "Errore nella sonda"
 	} else {
-		event["message"] = "Esito sonda ok"
+		event.Message = "Esito sonda ok"
 	}
 
 	e.logEvent(event)
