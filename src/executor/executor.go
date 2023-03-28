@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -95,22 +96,22 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 	event.Network, event.NetworkErrorCount = e.getNetworkLogs()
 	if shot {
 		event.ScreenShoot = "probes-" + uuid.New().String()
-		e.doScreenshot(event.ScreenShoot)
+		if err := e.doScreenshot(event.ScreenShoot); err != nil {
+			log.Println("error generating screenshot: ", err.Error())
+		}
 	}
 	return event
 }
 
-func (e *Executor) doScreenshot(screenshotId string) {
+func (e *Executor) doScreenshot(screenshotId string) error {
 	//480p = 858 x 480 - 720p = 1280 x 720 - 1080p = 1920 x 1080 — FullHD
 	screenshot, err := e.driver.Screenshot()
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		return err
 	}
 	scaled, err := Scale(screenshot, 1920, 1080)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		return err
 	}
 	screenshotData := base64.StdEncoding.EncodeToString(scaled)
 	if e.useHtmlEncoding {
@@ -127,22 +128,26 @@ func (e *Executor) doScreenshot(screenshotId string) {
 		"screenshot":  screenshotData,
 		"business_id": e.bid,
 	}
-	imageData, _ := json.Marshal(imageEvent)
+	imageData, err := json.Marshal(imageEvent)
+	if err != nil {
+		return err
+	}
 	f, err := os.OpenFile(e.imgFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println("error writing log file", err.Error())
-		return
+		return err
 	}
 	_, _ = f.Write(imageData)
 	_, _ = f.Write([]byte("\n"))
 	_ = f.Sync()
 	f.Close()
+
+	return nil
 }
 
 func (e *Executor) doLog(message string) {
 	f, err := os.OpenFile(e.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println("error writing log file", err.Error())
+		log.Println("error writing log file", err.Error())
 		return
 	}
 	_, _ = f.Write([]byte(message))
@@ -164,7 +169,7 @@ func (e *Executor) logInfo(message string) {
 func (e *Executor) logEvent(event *Event) {
 	message, err := json.Marshal(event)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		return
 	}
 	e.doLog(string(message))
@@ -182,47 +187,46 @@ func (e *Executor) humanWait() {
 }
 
 func (e *Executor) getNetworkLogs() (map[string]interface{}, int) {
-	logEntries, err := e.driver.Log(base.LogPerformance)
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, 0
-	}
-
 	errorCount := 0
 	var headersData []map[string]interface{}
 
-	for _, entry := range logEntries {
-		var message NetworkMessage
-		if err := json.Unmarshal([]byte(entry.Message), &message); err != nil {
-			fmt.Println(err.Error())
-			continue
-		}
-		if message.Method != "Network.responseReceived" {
-			continue
-		}
+	logEntries, err := e.driver.Log(base.LogPerformance)
+	if err != nil {
+		log.Println(err.Error())
+	} else {
+		for _, entry := range logEntries {
+			var message NetworkMessage
+			if err := json.Unmarshal([]byte(entry.Message), &message); err != nil {
+				log.Println(err.Error())
+				continue
+			}
+			if message.Method != "Network.responseReceived" {
+				continue
+			}
 
-		if e.networkFilter.MatchString(message.Params.Response.Url) {
-			headers := message.Params.Response.Headers
-			headers["Url"] = message.Params.Response.Url
-			headers["Status"] = message.Params.Response.Status
-			headers["Timing"] = message.Params.Response.Timing
-			contentType, _ := MapToString(headers, "Content-Type")
+			if e.networkFilter.MatchString(message.Params.Response.Url) {
+				headers := message.Params.Response.Headers
+				headers["Url"] = message.Params.Response.Url
+				headers["Status"] = message.Params.Response.Status
+				headers["Timing"] = message.Params.Response.Timing
+				contentType, _ := MapToString(headers, "Content-Type")
 
-			if strings.Contains(contentType, "text/html") || strings.Contains(contentType, "json") {
-				if len(e.bid) == 0 {
-					if bid, ok := MapToString(headers, "businessID"); ok {
-						e.bid = bid
+				if strings.Contains(contentType, "text/html") || strings.Contains(contentType, "json") {
+					if len(e.bid) == 0 {
+						if bid, ok := MapToString(headers, "businessID"); ok {
+							e.bid = bid
+						}
 					}
-				}
-				if status, _ := MapToFloat64(headers, "status"); status >= 400 {
-					errorCount++
-				}
-				for key := range headers {
-					if key != "url" && key != "status" && key != "businessID" {
-						delete(headers, key)
+					if status, _ := MapToFloat64(headers, "status"); status >= 400 {
+						errorCount++
 					}
+					for key := range headers {
+						if key != "url" && key != "status" && key != "businessID" {
+							delete(headers, key)
+						}
+					}
+					headersData = append(headersData, map[string]interface{}{"headers": headers})
 				}
-				headersData = append(headersData, map[string]interface{}{"headers": headers})
 			}
 		}
 	}
@@ -259,8 +263,8 @@ func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
 		return nil
 	}
 
-	start := time.Now().UnixMilli()
-	for time.Now().UnixMilli()-start < int64(e.wait) {
+	start := UnixMilli(time.Now())
+	for UnixMilli(time.Now())-start < int64(e.wait) {
 		found := false
 		elem = e.findElement(search, data)
 		if until == 0 {
@@ -363,12 +367,12 @@ func (e *Executor) timerHandler(target string, until string, value string) error
 
 func (e *Executor) waitForMouse(target string, until string, value string) error {
 	var err error
-	var start = time.Now().UnixMilli()
+	var start = UnixMilli(time.Now())
 	var elm = e.getElementByMode(target, 2)
 	if elm == nil {
 		return fmt.Errorf("element isn't ready")
 	}
-	for time.Now().UnixMilli()-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
 		switch until {
 		case "click":
@@ -469,10 +473,10 @@ func (e *Executor) waitForType(target string, data string) error {
 		return fmt.Errorf("element isn't ready")
 	}
 	var err error
-	start := time.Now().UnixMilli()
+	start := UnixMilli(time.Now())
 	pos := 0
 
-	for time.Now().UnixMilli()-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
 		if err = elm.SendKeys(string(data[pos])); err != nil {
 			if elm = e.getElementByMode(target, 2); elm == nil {
@@ -497,8 +501,8 @@ func (e *Executor) waitForType(target string, data string) error {
 
 func (e *Executor) waitForScript(script string, args []interface{}) error {
 	var err error
-	start := time.Now().UnixMilli()
-	for time.Now().UnixMilli()-start < int64(e.wait) {
+	start := UnixMilli(time.Now())
+	for UnixMilli(time.Now())-start < int64(e.wait) {
 		_, err = e.driver.ExecuteScript(script, args)
 		if err == nil {
 			break
@@ -664,7 +668,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	if e.errorDisabled {
 		err = nil
 	}
-	var dur = time.Now().UnixMilli() - start.UnixMilli()
+	var dur = UnixMilli(time.Now()) - UnixMilli(start)
 	var event = e.createEvent(e.fileId, "intermediate", err, start, dur, err != nil)
 	event.Label = id
 	event.Target = target
@@ -685,7 +689,7 @@ func (e *Executor) finalize(err error) {
 		}
 	}
 
-	var dur = time.Now().UnixMilli() - e.start.UnixMilli()
+	var dur = UnixMilli(time.Now()) - UnixMilli(e.start)
 	var event = e.createEvent(e.fileId, "full", err, e.start, dur, false)
 	if err != nil {
 		event.Message = "Errore nella sonda"

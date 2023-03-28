@@ -11,6 +11,10 @@ type Timer struct {
 	Data      []int64
 }
 
+func UnixMilli(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond)
+}
+
 func NewTimer(id string, desc string) *Timer {
 	return &Timer{
 		Id:        id,
@@ -23,11 +27,11 @@ func NewTimer(id string, desc string) *Timer {
 
 func (t *Timer) Run() {
 	t.Start = time.Now()
-	t.Epoch = t.Start.UnixMilli()
+	t.Epoch = UnixMilli(t.Start)
 }
 
 func (t *Timer) Stop() {
-	var epoch = time.Now().UnixMilli()
+	var epoch = UnixMilli(time.Now())
 	var diff = epoch - t.Epoch
 	t.Epoch = epoch
 	t.Data = append(t.Data, diff)
