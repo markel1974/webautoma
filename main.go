@@ -17,6 +17,36 @@ import (
 //go mod tidy
 //go mod vendor
 
+const (
+	defaultLogFile    = "log.json"
+	defaultImagesFile = "images.json"
+)
+
+func createCapture(capture string) []string {
+	var captureData []string
+	if len(capture) > 0 {
+		captureData = strings.Split(capture, ",")
+	}
+	return captureData
+}
+
+func createVariables(variables string) map[string]interface{} {
+	var varData map[string]interface{}
+	if len(variables) > 0 {
+		for _, v := range strings.Split(variables, ",") {
+			kv := strings.Split(v, "=")
+			if len(kv) < 2 {
+				continue
+			}
+			if varData == nil {
+				varData = make(map[string]interface{})
+			}
+			varData[strings.TrimSpace(kv[0])] = kv[1]
+		}
+	}
+	return varData
+}
+
 func main() {
 	var showHelp bool
 	var showVersion bool
@@ -36,8 +66,8 @@ func main() {
 	flag.IntVar(&port, "p", 9515, "web driver port")
 	flag.StringVar(&webDriverPath, "s", "", "web driver service path")
 	flag.BoolVar(&startWebDriverOnly, "w", false, "start webdriver only")
-	flag.StringVar(&logFile, "l", "log.json", "default log file")
-	flag.StringVar(&imgFile, "i", "images.json", "default image file")
+	flag.StringVar(&logFile, "l", defaultLogFile, "log file")
+	flag.StringVar(&imgFile, "i", defaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
 	flag.StringVar(&variables, "z", "", "variables (es a=10;b=20")
 	flag.Parse()
@@ -71,33 +101,14 @@ func main() {
 	}
 
 	if len(logFile) == 0 {
-		logFile = "log.json"
+		logFile = defaultLogFile
 	}
 
 	if len(imgFile) == 0 {
-		imgFile = "images.json"
+		imgFile = defaultImagesFile
 	}
 
-	var varData map[string]interface{}
-
-	if len(variables) > 0 {
-		for _, v := range strings.Split(variables, ",") {
-			kv := strings.Split(v, "=")
-			if len(kv) < 2 {
-				continue
-			}
-			if varData == nil {
-				varData = make(map[string]interface{})
-			}
-			varData[strings.TrimSpace(kv[0])] = kv[1]
-		}
-	}
-
-	var captureData []string = nil
-	if len(capture) > 0 {
-		captureData = strings.Split(capture, ",")
-	}
-	exec, err := executor.New(execFile, logFile, imgFile, captureData, varData)
+	exec, err := executor.New(execFile, logFile, imgFile, createCapture(capture), createVariables(variables))
 	if err != nil {
 		log.Fatal(err.Error())
 	}
