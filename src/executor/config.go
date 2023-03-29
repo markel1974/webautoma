@@ -13,8 +13,11 @@ type ConfigTest struct {
 }
 
 type Config struct {
-	Url     string       `json:"url"`
-	Timeout *int         `json:"timeout"`
-	Quit    *bool        `json:"quit"`
-	Tests   []ConfigTest `json:"tests"`
+	Url                 string       `json:"url"`
+	Timeout             *int         `json:"timeout"`
+	HumanWait           *int         `json:"humanWait"`
+	RetryInterval       *int         `json:"retryInterval"`
+	MaxScreenshotLength *int         `json:"maxScreenshotLength"`
+	Quit                *bool        `json:"quit"`
+	Tests               []ConfigTest `json:"tests"`
 }

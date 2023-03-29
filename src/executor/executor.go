@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math"
 	"math/rand"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +19,17 @@ import (
 
 const RFC3339Milli = "2006-01-02T15:04:05.000Z07:00"
 
+type Loglevel int
+
+const (
+	LogLevelDebug    Loglevel = -1
+	LogLevelInfo     Loglevel = 0
+	LogLevelWarning  Loglevel = 1
+	LogLevelCritical Loglevel = 2
+)
+
 type Executor struct {
+	cfgFile             string
 	logFile             string
 	imgFile             string
 	driver              base.IWebDriver
@@ -33,23 +41,25 @@ type Executor struct {
 	quit                bool
 	uuid                string
 	useHtmlEncoding     bool
-	bid                 string
 	maxScreenshotLength int
 	errorDisabled       bool
 	debug               bool
 	maxRetry            int
 	timers              map[string]*Timer
 	probeId             string
-	networkFilter       *regexp.Regexp
 	drag                base.IWebElement
 	mainWindow          string
+	network             *Network
+	templates           *Templates
 	cfg                 Config
 }
 
-func New(fileName string, logFile string, imgFile string) (*Executor, error) {
+func New(fileName string, logFile string, imgFile string, capture []string, variables map[string]interface{}) (*Executor, error) {
 	e := &Executor{
-		logFile:             logFile,
-		imgFile:             imgFile,
+		logFile:             "",
+		imgFile:             "",
+		network:             NewNetwork(capture),
+		templates:           NewTemplates(variables),
 		driver:              nil,
 		fileId:              computeFileId(fileName),
 		quit:                false,
@@ -58,16 +68,27 @@ func New(fileName string, logFile string, imgFile string) (*Executor, error) {
 		wait:                60000,
 		uuid:                uuid.New().String(),
 		useHtmlEncoding:     true,
-		bid:                 "",
 		maxScreenshotLength: 0,
 		errorDisabled:       false,
 		debug:               false,
 		maxRetry:            3,
 		timers:              make(map[string]*Timer),
 		probeId:             "",
-		networkFilter:       regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
 	}
-	fileData, err := ioutil.ReadFile(fileName)
+	var err error
+	e.logFile, err = e.templates.Apply(logFile)
+	if err != nil {
+		return nil, err
+	}
+	e.imgFile, err = e.templates.Apply(imgFile)
+	if err != nil {
+		return nil, err
+	}
+	e.cfgFile, err = e.templates.Apply(fileName)
+	if err != nil {
+		return nil, err
+	}
+	fileData, err := ioutil.ReadFile(e.cfgFile)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +100,15 @@ func New(fileName string, logFile string, imgFile string) (*Executor, error) {
 	}
 	if e.cfg.Quit != nil {
 		e.quit = *e.cfg.Quit
+	}
+	if e.cfg.HumanWait != nil {
+		e.humanWaitBase = *e.cfg.HumanWait
+	}
+	if e.cfg.RetryInterval != nil {
+		e.retryInterval = *e.cfg.RetryInterval
+	}
+	if e.cfg.MaxScreenshotLength != nil {
+		e.maxScreenshotLength = *e.cfg.MaxScreenshotLength
 	}
 	return e, nil
 }
@@ -92,12 +122,16 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 	event := NewEvent(id, kind, err, start, dur)
 	event.ProbeId = e.probeId
 	event.UUID = e.uuid
-	event.BusinessId = e.bid
-	event.Network, event.NetworkErrorCount = e.getNetworkLogs()
+	logEntries, err := e.driver.Log(base.LogPerformance)
+	if err != nil {
+		e.log(LogLevelCritical, err.Error())
+	}
+	event.Network, event.NetworkErrorCount = e.network.Compute(logEntries)
+	event.Acquired = e.network.Acquired()
 	if shot {
 		event.ScreenShoot = "probes-" + uuid.New().String()
 		if err := e.doScreenshot(event.ScreenShoot); err != nil {
-			log.Println("error generating screenshot: ", err.Error())
+			e.log(LogLevelCritical, "error generating screenshot: "+err.Error())
 		}
 	}
 	return event
@@ -123,11 +157,12 @@ func (e *Executor) doScreenshot(screenshotId string) error {
 		}
 	}
 	imageEvent := map[string]interface{}{
-		"id":          screenshotId,
-		"length":      len(screenshotData),
-		"screenshot":  screenshotData,
-		"business_id": e.bid,
+		"id":         screenshotId,
+		"length":     len(screenshotData),
+		"screenshot": screenshotData,
+		//"business_id": e.bid,
 	}
+	imageEvent["acquired"] = e.network.Acquired()
 	imageData, err := json.Marshal(imageEvent)
 	if err != nil {
 		return err
@@ -144,10 +179,10 @@ func (e *Executor) doScreenshot(screenshotId string) error {
 	return nil
 }
 
-func (e *Executor) doLog(message string) {
+func (e *Executor) doWriteLog(message string) {
 	f, err := os.OpenFile(e.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println("error writing log file", err.Error())
+		e.log(LogLevelCritical, "error writing log file: "+err.Error())
 		return
 	}
 	_, _ = f.Write([]byte(message))
@@ -156,23 +191,35 @@ func (e *Executor) doLog(message string) {
 	f.Close()
 }
 
-func (e *Executor) logDebug(message string) {
-	if e.debug {
-		e.doLog(message)
+func (e *Executor) log(kind Loglevel, src string) {
+	if kind == -1 && !e.debug {
+		return
 	}
-}
-
-func (e *Executor) logInfo(message string) {
-	e.doLog(message)
+	var severity string
+	switch kind {
+	case LogLevelDebug:
+		severity = "debug"
+	case LogLevelInfo:
+		severity = "info"
+	case LogLevelWarning:
+		severity = "warning"
+	case LogLevelCritical:
+		severity = "critical"
+	default:
+		severity = "info"
+	}
+	event := map[string]interface{}{"severity": severity, "data": src}
+	message, _ := json.Marshal(event)
+	e.doWriteLog(string(message))
 }
 
 func (e *Executor) logEvent(event *Event) {
 	message, err := json.Marshal(event)
 	if err != nil {
-		log.Println(err.Error())
+		e.log(LogLevelCritical, err.Error())
 		return
 	}
-	e.doLog(string(message))
+	e.doWriteLog(string(message))
 }
 
 func (e *Executor) doSleep(interval int) {
@@ -184,57 +231,6 @@ func (e *Executor) humanWait() {
 	val := math.Round(rnd * 100)
 	interval := e.humanWaitBase + int(val)
 	e.doSleep(interval)
-}
-
-func (e *Executor) getNetworkLogs() (map[string]interface{}, int) {
-	errorCount := 0
-	var headersData []map[string]interface{}
-
-	logEntries, err := e.driver.Log(base.LogPerformance)
-	if err != nil {
-		log.Println(err.Error())
-	} else {
-		for _, entry := range logEntries {
-			var message NetworkMessage
-			if err := json.Unmarshal([]byte(entry.Message), &message); err != nil {
-				log.Println(err.Error())
-				continue
-			}
-			if message.Method != "Network.responseReceived" {
-				continue
-			}
-
-			if e.networkFilter.MatchString(message.Params.Response.Url) {
-				headers := message.Params.Response.Headers
-				headers["Url"] = message.Params.Response.Url
-				headers["Status"] = message.Params.Response.Status
-				headers["Timing"] = message.Params.Response.Timing
-				contentType, _ := MapToString(headers, "Content-Type")
-
-				if strings.Contains(contentType, "text/html") || strings.Contains(contentType, "json") {
-					if len(e.bid) == 0 {
-						if bid, ok := MapToString(headers, "businessID"); ok {
-							e.bid = bid
-						}
-					}
-					if status, _ := MapToFloat64(headers, "status"); status >= 400 {
-						errorCount++
-					}
-					for key := range headers {
-						if key != "url" && key != "status" && key != "businessID" {
-							delete(headers, key)
-						}
-					}
-					headersData = append(headersData, map[string]interface{}{"headers": headers})
-				}
-			}
-		}
-	}
-	network := map[string]interface{}{
-		"errorCount": errorCount,
-		"data":       headersData,
-	}
-	return network, errorCount
 }
 
 func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
@@ -307,7 +303,7 @@ func (e *Executor) getCoords(data string) base.Point {
 func (e *Executor) findElement(by string, data string) base.IWebElement {
 	elm, err := e.driver.FindElement(by, data)
 	if err != nil {
-		e.logDebug("findElement: " + err.Error())
+		e.log(LogLevelDebug, "findElement: "+err.Error())
 	}
 	return elm
 }
@@ -315,20 +311,20 @@ func (e *Executor) findElement(by string, data string) base.IWebElement {
 func (e *Executor) isElementReady(elm base.IWebElement) bool {
 	ok, err := elm.IsEnabled()
 	if err != nil {
-		e.logDebug("isElementReady (IsEnabled): " + err.Error())
+		e.log(LogLevelDebug, "isElementReady (IsEnabled): "+err.Error())
 		return false
 	}
 	if !ok {
-		e.logDebug("isElementReady: element isn't enabled")
+		e.log(LogLevelDebug, "isElementReady: element isn't enabled")
 		return false
 	}
 	ok, err = elm.IsDisplayed()
 	if err != nil {
-		e.logDebug("isElementReady (IsDisplayed): " + err.Error())
+		e.log(LogLevelDebug, "isElementReady (IsDisplayed): "+err.Error())
 		return false
 	}
 	if !ok {
-		e.logDebug("isElementReady: element isn't displayed")
+		e.log(LogLevelDebug, "isElementReady: element isn't displayed")
 		return false
 	}
 	return true
@@ -480,7 +476,7 @@ func (e *Executor) waitForType(target string, data string) error {
 		err = nil
 		if err = elm.SendKeys(string(data[pos])); err != nil {
 			if elm = e.getElementByMode(target, 2); elm == nil {
-				e.logDebug("waitForType: element isn't ready, returning...")
+				e.log(LogLevelDebug, "waitForType: element isn't ready, returning...")
 				return fmt.Errorf("element isn't ready")
 			}
 		}
@@ -663,7 +659,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "setTimeout":
 		e.wait = parseInt(value)
 	default:
-		e.logInfo("unimplemented command: " + command)
+		e.log(LogLevelWarning, "unimplemented command: "+command)
 	}
 	if e.errorDisabled {
 		err = nil
@@ -699,7 +695,6 @@ func (e *Executor) finalize(err error) {
 
 	e.logEvent(event)
 
-	//WDS.sampleResult.sampleEnd()
 	if e.quit {
 		_ = e.driver.Quit()
 	}
@@ -710,28 +705,42 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 	e.driver = driver
 	e.start = time.Now()
 
-	//WDS.sampleResult.sampleStart()
+	e.log(LogLevelInfo, "Sample started")
 
-	e.logInfo("Sample started")
-
-	//var logTypes = e.driver.manage().logs().getAvailableLogTypes()
-	//e.logInfo(logTypes)
-
-	if err := e.loadUrl(e.cfg.Url); err != nil {
+	url, err := e.templates.Apply(e.cfg.Url)
+	if err != nil {
+		return err
+	}
+	if err := e.loadUrl(url); err != nil {
 		e.finalize(err)
 		return err
 	}
-
 	e.mainWindow, err = e.driver.CurrentWindowHandle()
 	if err != nil {
 		e.finalize(err)
 		return err
 	}
 
-	e.logInfo("mainWindow: " + e.mainWindow)
+	e.log(LogLevelInfo, "mainWindow: "+e.mainWindow)
 
 	for _, test := range e.cfg.Tests {
 		for _, cmd := range test.Commands {
+			var err error
+			if cmd.Id, err = e.templates.Apply(cmd.Id); err != nil {
+				return err
+			}
+			if cmd.Command, err = e.templates.Apply(cmd.Command); err != nil {
+				return err
+			}
+			if cmd.Target, err = e.templates.Apply(cmd.Target); err != nil {
+				return err
+			}
+			if cmd.Until, err = e.templates.Apply(cmd.Until); err != nil {
+				return err
+			}
+			if cmd.Value, err = e.templates.Apply(cmd.Value); err != nil {
+				return err
+			}
 			if err = e.exec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value); err != nil {
 				e.finalize(err)
 				return err

@@ -14,9 +14,9 @@ type Event struct {
 	Level             string                 `json:"livello"`
 	Error             string                 `json:"error"`
 	Passed            bool                   `json:"passed"`
-	BusinessId        string                 `json:"business_id"`
-	Network           map[string]interface{} `json:"network"`
 	NetworkErrorCount int                    `json:"networkErrorCount"`
+	Network           map[string]interface{} `json:"network"`
+	Acquired          map[string]interface{} `json:"acquired,omitempty"`
 	ScreenShoot       string                 `json:"screenshotId,omitempty"`
 	Label             string                 `json:"label,omitempty"`
 	Target            string                 `json:"target,omitempty"`
@@ -42,7 +42,6 @@ func NewEvent(id string, kind string, err error, start time.Time, dur int64) *Ev
 		Level:             "INFO",
 		Error:             errorDesc,
 		Passed:            err == nil,
-		BusinessId:        "",
 		Network:           nil,
 		NetworkErrorCount: 0,
 		ScreenShoot:       "",

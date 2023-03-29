@@ -10,6 +10,7 @@ import (
 	"github.com/markel1974/webautoma/src/wd/base"
 	"github.com/markel1974/webautoma/src/wd/caps/chrome"
 	"log"
+	"strings"
 )
 
 //export GOPRIVATE=github.com/markel1974/webautoma
@@ -26,7 +27,8 @@ func main() {
 	var startWebDriverOnly bool
 	var logFile string
 	var imgFile string
-
+	var capture string
+	var variables string
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&execFile, "x", "", "exec file")
@@ -36,7 +38,8 @@ func main() {
 	flag.BoolVar(&startWebDriverOnly, "w", false, "start webdriver only")
 	flag.StringVar(&logFile, "l", "log.json", "default log file")
 	flag.StringVar(&imgFile, "i", "images.json", "default image file")
-	//images.log
+	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
+	flag.StringVar(&variables, "z", "", "variables (es a=10;b=20")
 	flag.Parse()
 
 	if showHelp {
@@ -75,7 +78,26 @@ func main() {
 		imgFile = "images.json"
 	}
 
-	exec, err := executor.New(execFile, logFile, imgFile)
+	var varData map[string]interface{}
+
+	if len(variables) > 0 {
+		for _, v := range strings.Split(variables, ",") {
+			kv := strings.Split(v, "=")
+			if len(kv) < 2 {
+				continue
+			}
+			if varData == nil {
+				varData = make(map[string]interface{})
+			}
+			varData[strings.TrimSpace(kv[0])] = kv[1]
+		}
+	}
+
+	var captureData []string = nil
+	if len(capture) > 0 {
+		captureData = strings.Split(capture, ",")
+	}
+	exec, err := executor.New(execFile, logFile, imgFile, captureData, varData)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
