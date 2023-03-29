@@ -585,7 +585,7 @@ func (e *Executor) selectAlert(value int) error {
 }
 
 func (e *Executor) closeWindow() error {
-	var currentWindow, err = e.driver.CurrentWindowHandle()
+	currentWindow, err := e.driver.CurrentWindowHandle()
 	if err != nil {
 		return err
 	}
