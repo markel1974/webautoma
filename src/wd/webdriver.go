@@ -571,9 +571,7 @@ func (wd *WebDriver) GetCookies() ([]base.Cookie, error) {
 }
 
 func (wd *WebDriver) AddCookie(cookie *base.Cookie) error {
-	return wd.voidCommand("/session/%s/cookie", map[string]*base.Cookie{
-		"cookie": cookie,
-	})
+	return wd.voidCommand("/session/%s/cookie", map[string]*base.Cookie{"cookie": cookie})
 }
 
 func (wd *WebDriver) DeleteAllCookies() error {
@@ -589,9 +587,7 @@ func (wd *WebDriver) DeleteCookie(name string) error {
 }
 
 func (wd *WebDriver) Click(button int) error {
-	return wd.voidCommand("/session/%s/click", map[string]int{
-		"button": button,
-	})
+	return wd.voidCommand("/session/%s/click", map[string]int{"button": button})
 }
 
 func (wd *WebDriver) DoubleClick() error {
