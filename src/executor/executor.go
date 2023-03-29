@@ -602,20 +602,32 @@ func (e *Executor) closeWindow() error {
 	return nil
 }
 
-func (e *Executor) createStack(target string, until string) {
-	e.stack = nil
+func (e *Executor) stackAdd(id string, target string, until string) {
 	v := 0
 	if len(until) > 0 {
 		v = 1
 	}
 	if analyzedElm := e.getElementByMode(target, v); analyzedElm != nil {
-		e.stack = make(map[string]interface{})
-		e.stack["_target"] = target
-		e.stack["_displayed"], _ = analyzedElm.IsDisplayed()
-		e.stack["_enabled"], _ = analyzedElm.IsEnabled()
-		e.stack["_text"], _ = analyzedElm.Text()
-		e.stack["_tagName"], _ = analyzedElm.TagName()
+		values := make(map[string]interface{})
+		values["target"] = target
+		values["displayed"], _ = analyzedElm.IsDisplayed()
+		values["enabled"], _ = analyzedElm.IsEnabled()
+		values["text"], _ = analyzedElm.Text()
+		values["tagName"], _ = analyzedElm.TagName()
+		if e.stack == nil {
+			e.stack = make(map[string]interface{})
+		}
+		e.stack[id] = values
 	}
+}
+
+func (e *Executor) stackPrint() {
+	k, _ := json.MarshalIndent(e.stack, "", "	")
+	fmt.Println(string(k))
+}
+
+func (e *Executor) stackReset() {
+	e.stack = nil
 }
 
 func (e *Executor) exists(target string, until string) error {
@@ -640,11 +652,6 @@ func (e *Executor) until(target string, until string) error {
 	return nil
 }
 
-func (e *Executor) printStack() {
-	k, _ := json.Marshal(e.stack)
-	fmt.Println(string(k))
-}
-
 func (e *Executor) exec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -664,10 +671,12 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		err = e.timerHandler(target, command, value)
 	case "exists":
 		err = e.exists(target, until)
-	case "createStack":
-		e.createStack(target, until)
-	case "printStack":
-		e.printStack()
+	case "stackAdd":
+		e.stackAdd(id, target, until)
+	case "stackReset":
+		e.stackReset()
+	case "stackPrint":
+		e.stackPrint()
 	case "disableError":
 		e.errorDisabled = true
 	case "enableError":
