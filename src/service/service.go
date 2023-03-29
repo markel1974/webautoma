@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
 type Service struct {
 	port        int
-	addr        string
+	url         string
 	cmd         *exec.Cmd
 	shutdownURL string
 	screenSize  string
@@ -20,12 +22,18 @@ type Service struct {
 	display     bool
 }
 
-func NewService(path string, args []string, urlPrefix string, port int, shutdownURL string) (*Service, error) {
+func NewService(nohup bool, wdPath string, wdArgs []string, wdUrl *url.URL, shutdownURL string) (*Service, error) {
+	if nohup {
+		wdArgs = append([]string{wdPath}, wdArgs...)
+		wdPath = "nohup"
+	}
+
+	port, _ := strconv.Atoi(wdUrl.Port())
 	s := &Service{
 		port:        port,
-		addr:        fmt.Sprintf("http://localhost:%d/%s", port, urlPrefix),
+		url:         wdUrl.String(),
 		shutdownURL: shutdownURL,
-		cmd:         exec.Command(path, args...),
+		cmd:         exec.Command(wdPath, wdArgs...),
 		display:     false,
 	}
 	s.cmd.Env = os.Environ()
@@ -61,7 +69,7 @@ func (s *Service) Start() error {
 	}
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		resp, err := http.Get(s.addr + "/status")
+		resp, err := http.Get(s.url + "/status")
 		if err == nil {
 			_ = resp.Body.Close()
 			switch resp.StatusCode {
@@ -79,7 +87,7 @@ func (s *Service) Stop() error {
 			return err
 		}
 	} else {
-		resp, err := http.Get(s.addr + s.shutdownURL)
+		resp, err := http.Get(s.url + s.shutdownURL)
 		if err != nil {
 			return err
 		}

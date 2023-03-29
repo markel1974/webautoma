@@ -34,8 +34,6 @@ type Actions []map[string]interface{}
 const (
 	DefaultContentType = "application/json"
 
-	DefaultURLPrefix = "http://127.0.0.1:4444/wd/hub"
-
 	DefaultWaitInterval = 100 * time.Millisecond
 
 	DefaultWaitTimeout = 60 * time.Second
@@ -162,12 +160,9 @@ func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, 
 	return buf, nil
 }
 
-func NewWebDriver(capabilities base.Capabilities, urlPrefix string) *WebDriver {
-	if urlPrefix == "" {
-		urlPrefix = DefaultURLPrefix
-	}
+func NewWebDriver(capabilities base.Capabilities, wdUrl *url.URL) *WebDriver {
 	wd := &WebDriver{
-		urlPrefix:    urlPrefix,
+		urlPrefix:    wdUrl.String(),
 		capabilities: capabilities,
 		client:       http.DefaultClient,
 	}

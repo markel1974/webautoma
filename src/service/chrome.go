@@ -1,23 +1,23 @@
 package service
 
 import (
-	"strconv"
+	"net/url"
 )
 
 type ChromeService struct {
 	*Service
 }
 
-func NewChromeService(path string, port int, base string, verbose bool) (*ChromeService, error) {
-	var args []string
-	args = append(args, "--port="+strconv.Itoa(port))
-	if len(base) > 0 {
-		args = append(args, "--url-base="+base)
+func NewChromeService(nohup bool, wdPath string, wdUrl *url.URL, verbose bool) (*ChromeService, error) {
+	var wdArgs []string
+	wdArgs = append(wdArgs, "--port="+wdUrl.Port())
+	if len(wdUrl.Path) > 0 {
+		wdArgs = append(wdArgs, "--url-base="+wdUrl.Path)
 	}
 	if verbose {
-		args = append(args, "--verbose")
+		wdArgs = append(wdArgs, "--verbose")
 	}
-	svc, err := NewService(path, args, base, port, "/shutdown")
+	svc, err := NewService(nohup, wdPath, wdArgs, wdUrl, "/shutdown")
 	if err != nil {
 		return nil, err
 	}

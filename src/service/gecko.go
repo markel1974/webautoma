@@ -1,18 +1,18 @@
 package service
 
 import (
-	"strconv"
+	"net/url"
 )
 
 type GeckoService struct {
 	*Service
 }
 
-func NewGeckoService(path string, port int) (*GeckoService, error) {
+func NewGeckoService(nohup bool, path string, wdUrl *url.URL) (*GeckoService, error) {
 	var args []string
-	args = append(args, "--port="+strconv.Itoa(port))
+	args = append(args, "--port="+wdUrl.Port())
 
-	s, err := NewService(path, args, "", port, "")
+	s, err := NewService(nohup, path, args, wdUrl, "")
 	if err != nil {
 		return nil, err
 	}

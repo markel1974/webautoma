@@ -1,7 +1,7 @@
 package service
 
 import (
-	"strconv"
+	"net/url"
 	"strings"
 )
 
@@ -9,7 +9,7 @@ type SeleniumService struct {
 	*Service
 }
 
-func NewSeleniumService(port int, base string, jarPath string, java string, gecko string, chrome string, htmlUnit string, debug bool) (*SeleniumService, error) {
+func NewSeleniumService(nohup bool, wdUrl *url.URL, jarPath string, java string, gecko string, chrome string, htmlUnit string, debug bool) (*SeleniumService, error) {
 	path := "java"
 	if len(java) > 0 {
 		path = java
@@ -32,11 +32,11 @@ func NewSeleniumService(port int, base string, jarPath string, java string, geck
 		args = append(args, "-cp", strings.Join(classpath, ":"))
 	}
 	args = append(args, "org.openqa.grid.selenium.GridLauncherV3")
-	args = append(args, "-port", strconv.Itoa(port))
+	args = append(args, "-port", wdUrl.Port())
 	if debug {
 		args = append(args, "-debug")
 	}
-	svc, err := NewService(path, args, base, port, "")
+	svc, err := NewService(nohup, path, args, wdUrl, "")
 	if err != nil {
 		return nil, err
 	}

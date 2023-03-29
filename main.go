@@ -10,6 +10,7 @@ import (
 	"github.com/markel1974/webautoma/src/wd/base"
 	"github.com/markel1974/webautoma/src/wd/caps/chrome"
 	"log"
+	"net/url"
 	"strings"
 )
 
@@ -51,10 +52,11 @@ func main() {
 	var showHelp bool
 	var showVersion bool
 	var execFile string
-	var baseUrl string
+	var urlBase string
 	var port int
-	var webDriverPath string
-	var startWebDriverOnly bool
+	var urlPrefix string
+	var wdPath string
+	var wdOnly bool
 	var logFile string
 	var imgFile string
 	var capture string
@@ -62,10 +64,11 @@ func main() {
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&execFile, "x", "", "exec file")
-	flag.StringVar(&baseUrl, "b", "http://127.0.0.1", "web driver base url")
+	flag.StringVar(&urlBase, "b", "http://127.0.0.1", "web driver base url")
+	flag.StringVar(&urlPrefix, "u", "", "web driver prefix url")
 	flag.IntVar(&port, "p", 9515, "web driver port")
-	flag.StringVar(&webDriverPath, "s", "", "web driver service path")
-	flag.BoolVar(&startWebDriverOnly, "w", false, "start webdriver only")
+	flag.StringVar(&wdPath, "s", "", "web driver service path")
+	flag.BoolVar(&wdOnly, "w", false, "start webdriver only")
 	flag.StringVar(&logFile, "l", defaultLogFile, "log file")
 	flag.StringVar(&imgFile, "i", defaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
@@ -82,21 +85,36 @@ func main() {
 		return
 	}
 
-	if len(webDriverPath) > 0 {
-		svc, err := service.NewChromeService(webDriverPath, port, baseUrl, true)
+	sUrl := fmt.Sprintf("%s:%d", urlBase, port)
+	if len(urlPrefix) > 0 {
+		if !strings.HasPrefix(urlPrefix, "/") {
+			urlPrefix = "/" + urlPrefix
+		}
+		sUrl += urlPrefix
+	}
+
+	wdUrl, err := url.Parse(sUrl)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	if len(wdPath) > 0 {
+		svc, err := service.NewChromeService(wdOnly, wdPath, wdUrl, true)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 		if err := svc.Start(); err != nil {
 			log.Fatal(err.Error())
 		}
-		if startWebDriverOnly {
+		if wdOnly {
+			fmt.Println("service webdriver successfully started")
 			return
 		}
 	}
 
 	if len(execFile) == 0 {
-		log.Fatal("empty exec file")
+		fmt.Println("empty exec file")
+		flag.Usage()
 		return
 	}
 
@@ -113,8 +131,6 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	logType, logLevel := exec.RequiredLogs()
-
-	wdUrl := fmt.Sprintf("%s:%d", baseUrl, port)
 
 	chromeCaps := chrome.Caps{}
 	caps := base.Capabilities{}
