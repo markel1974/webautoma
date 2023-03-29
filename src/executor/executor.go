@@ -114,7 +114,6 @@ func New(fileName string, logFile string, imgFile string, capture []string, vari
 }
 
 func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
-	//TODO FROM CONFIG
 	return base.LogPerformance, base.LogAll
 }
 
@@ -389,7 +388,6 @@ func (e *Executor) waitForMouse(target string, until string, value string) error
 
 		case "rightClick":
 			if err = elm.MoveTo(0, 0); err == nil {
-				//TODO TEST
 				err = e.driver.Click(2)
 			}
 			//e.actions.contextClick(elm).perform()

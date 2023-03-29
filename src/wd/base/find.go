@@ -1,8 +1,5 @@
 package base
 
-// TODO: make an enum type called FindMethod.
-
-// Methods by which to find elements.
 const (
 	ByID              = "id"
 	ByXPATH           = "xpath"

@@ -73,7 +73,7 @@ type Caps struct {
 	W3C bool `json:"w3c"`
 }
 
-// TODO(minusnine): https://bugs.chromium.org/p/chromedriver/issues/detail?id=1625
+// TODO: https://bugs.chromium.org/p/chromedriver/issues/detail?id=1625
 // mentions "experimental options". Implement that.
 
 // MobileEmulation provides options for mobile emulation. Only
