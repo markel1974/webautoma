@@ -136,7 +136,7 @@ func main() {
 	caps := base.Capabilities{}
 	caps.SetLogLevel(logType, logLevel)
 	caps.SetChrome(chromeCaps)
-	driver := wd.NewWebDriver(caps, wdUrl)
+	driver := wd.NewWebDriver(caps, wdUrl, false)
 
 	if err := driver.Start(); err != nil {
 		log.Fatal(err.Error())

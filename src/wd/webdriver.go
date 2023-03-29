@@ -39,6 +39,28 @@ const (
 	DefaultWaitTimeout = 60 * time.Second
 )
 
+const (
+	// legacyWebElementIdentifier is the string constant used in the old
+	// WebDriver JSON protocol that is the key for the map that contains an
+	// unique element identifier.
+	legacyWebElementIdentifier = "ELEMENT"
+
+	// webElementIdentifier is the string constant defined by the W3C
+	// specification that is the key for the map that contains a unique element identifier.
+	webElementIdentifier = "element-6066-11e4-a52e-4f735466cecf"
+)
+
+func elementIDFromValue(v map[string]string) string {
+	for _, key := range []string{webElementIdentifier, legacyWebElementIdentifier} {
+		v, ok := v[key]
+		if !ok || v == "" {
+			continue
+		}
+		return v
+	}
+	return ""
+}
+
 func parseVersion(v string) (semver.Version, error) {
 	parts := strings.Split(v, ".")
 	var err error
@@ -53,118 +75,23 @@ func parseVersion(v string) (semver.Version, error) {
 }
 
 type WebDriver struct {
-	id, urlPrefix  string
+	id             string
+	urlPrefix      string
 	capabilities   base.Capabilities
 	w3cCompatible  bool
 	storedActions  Actions
 	browser        string
 	browserVersion semver.Version
 	client         *http.Client
+	debug          bool
 }
 
-func (wd *WebDriver) requestURL(template string, args ...interface{}) string {
-	return wd.urlPrefix + fmt.Sprintf(template, args...)
-}
-
-func (wd *WebDriver) newRequest(method string, url string, data []byte) (*http.Request, error) {
-	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Add("Accept", DefaultContentType)
-
-	return request, nil
-}
-
-func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, error) {
-	//debugLog("-> %s %s\n%s", method, filteredURL(url), data)
-	request, err := wd.newRequest(method, url, data)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := wd.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	buf, err := ioutil.ReadAll(response.Body)
-	/*
-		if debugFlag {
-			if err == nil {
-				// Pretty print the JSON response
-				var prettyBuf bytes.Buffer
-				if err = json.Indent(&prettyBuf, buf, "", "    "); err == nil && prettyBuf.Len() > 0 {
-					buf = prettyBuf.Bytes()
-				}
-			}
-			debugLog("<- %s [%s]\n%s", response.Status, response.Header["Content-Type"], buf)
-		}
-	*/
-	if err != nil {
-		return nil, errors.New(response.Status)
-	}
-
-	fullCType := response.Header.Get("Content-Type")
-	cType, _, err := mime.ParseMediaType(fullCType)
-	if err != nil {
-		return nil, fmt.Errorf("got content type header %q, expected %q", fullCType, DefaultContentType)
-	}
-	if cType != DefaultContentType {
-		return nil, fmt.Errorf("got content type %q, expected %q", cType, DefaultContentType)
-	}
-
-	reply := new(ServerReply)
-	if err := json.Unmarshal(buf, reply); err != nil {
-		if response.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("bad server reply status: %s", response.Status)
-		}
-		return nil, err
-	}
-	if reply.Err != "" {
-		return nil, &reply.Error
-	}
-
-	// Handle the W3C-compliant error format. In the W3C spec, the error is
-	// embedded in the 'value' field.
-	if len(reply.Value) > 0 {
-		respErr := new(base.Error)
-		if err := json.Unmarshal(reply.Value, respErr); err == nil && respErr.Err != "" {
-			respErr.HTTPCode = response.StatusCode
-			return nil, respErr
-		}
-	}
-
-	// Handle the legacy error format.
-	const success = 0
-	if reply.Status != success {
-		shortMsg, ok := base.RemoteErrors[reply.Status]
-		if !ok {
-			shortMsg = fmt.Sprintf("unknown error - %d", reply.Status)
-		}
-
-		longMsg := new(struct {
-			Message string
-		})
-		if err := json.Unmarshal(reply.Value, longMsg); err != nil {
-			return nil, errors.New(shortMsg)
-		}
-		return nil, &base.Error{
-			Err:        shortMsg,
-			Message:    longMsg.Message,
-			HTTPCode:   response.StatusCode,
-			LegacyCode: reply.Status,
-		}
-	}
-
-	return buf, nil
-}
-
-func NewWebDriver(capabilities base.Capabilities, wdUrl *url.URL) *WebDriver {
+func NewWebDriver(capabilities base.Capabilities, wdUrl *url.URL, debug bool) *WebDriver {
 	wd := &WebDriver{
 		urlPrefix:    wdUrl.String(),
 		capabilities: capabilities,
 		client:       http.DefaultClient,
+		debug:        debug,
 	}
 	if b := capabilities["browserName"]; b != nil {
 		wd.browser = b.(string)
@@ -179,8 +106,6 @@ func (wd *WebDriver) Start() error {
 	return nil
 }
 
-// DeleteSession deletes an existing session at the WebDriver instance
-// specified by the urlPrefix and the session ID.
 func (wd *WebDriver) DeleteSession(urlPrefix, id string) error {
 	u, err := url.Parse(urlPrefix)
 	if err != nil {
@@ -188,67 +113,6 @@ func (wd *WebDriver) DeleteSession(urlPrefix, id string) error {
 	}
 	u.Path = path.Join(u.Path, "session", id)
 	return wd.voidParamsCommand("DELETE", u.String(), nil)
-}
-
-func (wd *WebDriver) stringCommand(urlTemplate string) (string, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return "", err
-	}
-
-	reply := new(struct{ Value *string })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return "", err
-	}
-
-	if reply.Value == nil {
-		return "", fmt.Errorf("nil return value")
-	}
-
-	return *reply.Value, nil
-}
-
-func (wd *WebDriver) voidCommand(urlTemplate string, params interface{}) error {
-	return wd.voidParamsCommand("POST", wd.requestURL(urlTemplate, wd.id), params)
-}
-
-func (wd *WebDriver) voidParamsCommand(method, url string, params interface{}) error {
-	if params == nil {
-		params = make(map[string]interface{})
-	}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return err
-	}
-	_, err = wd.execute(method, url, data)
-	return err
-}
-
-func (wd *WebDriver) stringsCommand(urlTemplate string) ([]string, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	reply := new(struct{ Value []string })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return nil, err
-	}
-	return reply.Value, nil
-}
-
-func (wd *WebDriver) boolCommand(urlTemplate string) (bool, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return false, err
-	}
-	reply := new(struct{ Value bool })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return false, err
-	}
-	return reply.Value, nil
 }
 
 func (wd *WebDriver) Status() (*base.Status, error) {
@@ -507,34 +371,6 @@ func (wd *WebDriver) PageSource() (string, error) {
 	return wd.stringCommand("/session/%s/source")
 }
 
-func (wd *WebDriver) find(by string, value string, suffix string, url string) ([]byte, error) {
-	// The W3C specification removed the specific ID and Name locator strategies,
-	// instead only providing a CSS-based strategy. Emulate the old behavior to
-	// maintain API compatibility.
-	if wd.w3cCompatible {
-		switch by {
-		case base.ByID:
-			by = base.ByCSSSelector
-			value = "#" + value
-		case base.ByName:
-			by = base.ByCSSSelector
-			value = fmt.Sprintf("input[name=%q]", value)
-		}
-	}
-
-	params := map[string]string{"using": by, "value": value}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(url) == 0 {
-		url = "/session/%s/element"
-	}
-
-	return wd.execute("POST", wd.requestURL(url+suffix, wd.id), data)
-}
-
 func (wd *WebDriver) DecodeElement(data []byte) (base.IWebElement, error) {
 	reply := new(struct{ Value map[string]string })
 	if err := json.Unmarshal(data, &reply); err != nil {
@@ -549,28 +385,6 @@ func (wd *WebDriver) DecodeElement(data []byte) (base.IWebElement, error) {
 		parent: wd,
 		id:     id,
 	}, nil
-}
-
-const (
-	// legacyWebElementIdentifier is the string constant used in the old
-	// WebDriver JSON protocol that is the key for the map that contains an
-	// unique element identifier.
-	legacyWebElementIdentifier = "ELEMENT"
-
-	// webElementIdentifier is the string constant defined by the W3C
-	// specification that is the key for the map that contains a unique element identifier.
-	webElementIdentifier = "element-6066-11e4-a52e-4f735466cecf"
-)
-
-func elementIDFromValue(v map[string]string) string {
-	for _, key := range []string{webElementIdentifier, legacyWebElementIdentifier} {
-		v, ok := v[key]
-		if !ok || v == "" {
-			continue
-		}
-		return v
-	}
-	return ""
 }
 
 func (wd *WebDriver) DecodeElements(data []byte) ([]base.IWebElement, error) {
@@ -649,56 +463,6 @@ func (wd *WebDriver) MaximizeWindow(name string) error {
 
 func (wd *WebDriver) MinimizeWindow(name string) error {
 	return wd.modifyWindow(name, "POST", "minimize", map[string]string{})
-}
-
-func (wd *WebDriver) modifyWindow(handle string, verb string, command string, params interface{}) error {
-	// The original protocol allowed for maximizing any named window. The W3C
-	// specification only allows the current window be be modified. Emulate the
-	// previous behavior by switching to the target window, maximizing the
-	// current window, and switching back to the original window.
-	var startWindow string
-	if handle != "" && wd.w3cCompatible {
-		var err error
-		startWindow, err = wd.CurrentWindowHandle()
-		if err != nil {
-			return err
-		}
-		if handle != startWindow {
-			if err := wd.SwitchWindow(handle); err != nil {
-				return err
-			}
-		}
-	}
-
-	rUrl := wd.requestURL("/session/%s/window", wd.id)
-	if command != "" {
-		if wd.w3cCompatible {
-			rUrl = wd.requestURL("/session/%s/window/%s", wd.id, command)
-		} else {
-			rUrl = wd.requestURL("/session/%s/window/%s/%s", wd.id, handle, command)
-		}
-	}
-
-	var data []byte
-	if params != nil {
-		var err error
-		if data, err = json.Marshal(params); err != nil {
-			return err
-		}
-	}
-
-	if _, err := wd.execute(verb, rUrl, data); err != nil {
-		return err
-	}
-
-	// TODO: add a test for switching back to the original window.
-	if handle != startWindow && wd.w3cCompatible {
-		if err := wd.SwitchWindow(startWindow); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (wd *WebDriver) ResizeWindow(name string, width, height int) error {
@@ -849,28 +613,6 @@ func (wd *WebDriver) SendModifier(modifier string, isDown bool) error {
 	return wd.KeyUp(modifier)
 }
 
-func (wd *WebDriver) keyAction(action, keys string) error {
-	type keyAction struct {
-		Type string `json:"type"`
-		Key  string `json:"value"`
-	}
-	actions := make([]keyAction, 0, len(keys))
-	for _, key := range keys {
-		actions = append(actions, keyAction{
-			Type: action,
-			Key:  string(key),
-		})
-	}
-	return wd.voidCommand("/session/%s/actions", map[string]interface{}{
-		"actions": []interface{}{
-			map[string]interface{}{
-				"type":    "key",
-				"id":      "default keyboard",
-				"actions": actions,
-			}},
-	})
-}
-
 func (wd *WebDriver) KeyDown(keys string) error {
 	// Selenium implemented the actions API but has not yet updated its new session response.
 	if !wd.w3cCompatible && !(wd.browser == "firefox" && wd.browserVersion.Major > 47) {
@@ -939,32 +681,6 @@ func (wd *WebDriver) AlertText() (string, error) {
 func (wd *WebDriver) SetAlertText(text string) error {
 	data := map[string]string{"text": text}
 	return wd.voidCommand("/session/%s/alert/text", data)
-}
-
-func (wd *WebDriver) execScriptRaw(script string, args []interface{}, suffix string) ([]byte, error) {
-	if args == nil {
-		args = make([]interface{}, 0)
-	}
-	data, err := json.Marshal(map[string]interface{}{
-		"script": script,
-		"args":   args,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return wd.execute("POST", wd.requestURL("/session/%s/execute"+suffix, wd.id), data)
-}
-
-func (wd *WebDriver) execScript(script string, args []interface{}, suffix string) (interface{}, error) {
-	response, err := wd.execScriptRaw(script, args, suffix)
-	if err != nil {
-		return nil, err
-	}
-	reply := new(struct{ Value interface{} })
-	if err = json.Unmarshal(response, reply); err != nil {
-		return nil, err
-	}
-	return reply.Value, nil
 }
 
 func (wd *WebDriver) ExecuteScript(script string, args []interface{}) (interface{}, error) {
@@ -1065,4 +781,289 @@ func (wd *WebDriver) Log(kind base.LogType) ([]base.LogMessage, error) {
 	}
 
 	return val, nil
+}
+
+func (wd *WebDriver) requestURL(template string, args ...interface{}) string {
+	return wd.urlPrefix + fmt.Sprintf(template, args...)
+}
+
+func (wd *WebDriver) newRequest(method string, url string, data []byte) (*http.Request, error) {
+	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Add("Accept", DefaultContentType)
+	return request, nil
+}
+
+func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, error) {
+	request, err := wd.newRequest(method, url, data)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := wd.client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	buf, err := ioutil.ReadAll(response.Body)
+
+	if wd.debug {
+		fmt.Printf("%s %s %s --> %s [%s]\n", method, url, data, response.Status, response.Header["Content-Type"])
+		if err != nil {
+			fmt.Println(err.Error())
+		} else {
+			var pretty bytes.Buffer
+			if err := json.Indent(&pretty, buf, "", "	"); err == nil {
+				fmt.Println(pretty.String())
+			} else {
+				fmt.Println(string(buf))
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, errors.New(response.Status)
+	}
+
+	fullCType := response.Header.Get("Content-Type")
+	cType, _, err := mime.ParseMediaType(fullCType)
+	if err != nil {
+		return nil, fmt.Errorf("got content type header %q, expected %q", fullCType, DefaultContentType)
+	}
+	if cType != DefaultContentType {
+		return nil, fmt.Errorf("got content type %q, expected %q", cType, DefaultContentType)
+	}
+
+	reply := new(ServerReply)
+	if err := json.Unmarshal(buf, reply); err != nil {
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("bad server reply status: %s", response.Status)
+		}
+		return nil, err
+	}
+	if reply.Err != "" {
+		return nil, &reply.Error
+	}
+
+	// Handle the W3C-compliant error format. In the W3C spec, the error is embedded in the 'value' field.
+	if len(reply.Value) > 0 {
+		respErr := new(base.Error)
+		if err := json.Unmarshal(reply.Value, respErr); err == nil && respErr.Err != "" {
+			respErr.HTTPCode = response.StatusCode
+			return nil, respErr
+		}
+	}
+
+	// Handle the legacy error format.
+	const success = 0
+	if reply.Status != success {
+		shortMsg, ok := base.RemoteErrors[reply.Status]
+		if !ok {
+			shortMsg = fmt.Sprintf("unknown error - %d", reply.Status)
+		}
+
+		longMsg := new(struct {
+			Message string
+		})
+		if err := json.Unmarshal(reply.Value, longMsg); err != nil {
+			return nil, errors.New(shortMsg)
+		}
+		return nil, &base.Error{
+			Err:        shortMsg,
+			Message:    longMsg.Message,
+			HTTPCode:   response.StatusCode,
+			LegacyCode: reply.Status,
+		}
+	}
+
+	return buf, nil
+}
+
+func (wd *WebDriver) stringCommand(urlTemplate string) (string, error) {
+	rUrl := wd.requestURL(urlTemplate, wd.id)
+	response, err := wd.execute("GET", rUrl, nil)
+	if err != nil {
+		return "", err
+	}
+
+	reply := new(struct{ Value *string })
+	if err := json.Unmarshal(response, reply); err != nil {
+		return "", err
+	}
+
+	if reply.Value == nil {
+		return "", fmt.Errorf("nil return value")
+	}
+
+	return *reply.Value, nil
+}
+
+func (wd *WebDriver) voidCommand(urlTemplate string, params interface{}) error {
+	return wd.voidParamsCommand("POST", wd.requestURL(urlTemplate, wd.id), params)
+}
+
+func (wd *WebDriver) voidParamsCommand(method, url string, params interface{}) error {
+	if params == nil {
+		params = make(map[string]interface{})
+	}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+	_, err = wd.execute(method, url, data)
+	return err
+}
+
+func (wd *WebDriver) stringsCommand(urlTemplate string) ([]string, error) {
+	rUrl := wd.requestURL(urlTemplate, wd.id)
+	response, err := wd.execute("GET", rUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	reply := new(struct{ Value []string })
+	if err := json.Unmarshal(response, reply); err != nil {
+		return nil, err
+	}
+	return reply.Value, nil
+}
+
+func (wd *WebDriver) boolCommand(urlTemplate string) (bool, error) {
+	rUrl := wd.requestURL(urlTemplate, wd.id)
+	response, err := wd.execute("GET", rUrl, nil)
+	if err != nil {
+		return false, err
+	}
+	reply := new(struct{ Value bool })
+	if err := json.Unmarshal(response, reply); err != nil {
+		return false, err
+	}
+	return reply.Value, nil
+}
+
+func (wd *WebDriver) find(by string, value string, suffix string, url string) ([]byte, error) {
+	// The W3C specification removed the specific ID and Name locator strategies,
+	// instead only providing a CSS-based strategy. Emulate the old behavior to
+	// maintain API compatibility.
+	if wd.w3cCompatible {
+		switch by {
+		case base.ByID:
+			by = base.ByCSSSelector
+			value = "#" + value
+		case base.ByName:
+			by = base.ByCSSSelector
+			value = fmt.Sprintf("input[name=%q]", value)
+		}
+	}
+
+	params := map[string]string{"using": by, "value": value}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(url) == 0 {
+		url = "/session/%s/element"
+	}
+
+	return wd.execute("POST", wd.requestURL(url+suffix, wd.id), data)
+}
+
+func (wd *WebDriver) modifyWindow(handle string, verb string, command string, params interface{}) error {
+	// The original protocol allowed for maximizing any named window. The W3C
+	// specification only allows the current window be be modified. Emulate the
+	// previous behavior by switching to the target window, maximizing the
+	// current window, and switching back to the original window.
+	var startWindow string
+	if handle != "" && wd.w3cCompatible {
+		var err error
+		startWindow, err = wd.CurrentWindowHandle()
+		if err != nil {
+			return err
+		}
+		if handle != startWindow {
+			if err := wd.SwitchWindow(handle); err != nil {
+				return err
+			}
+		}
+	}
+
+	rUrl := wd.requestURL("/session/%s/window", wd.id)
+	if command != "" {
+		if wd.w3cCompatible {
+			rUrl = wd.requestURL("/session/%s/window/%s", wd.id, command)
+		} else {
+			rUrl = wd.requestURL("/session/%s/window/%s/%s", wd.id, handle, command)
+		}
+	}
+
+	var data []byte
+	if params != nil {
+		var err error
+		if data, err = json.Marshal(params); err != nil {
+			return err
+		}
+	}
+
+	if _, err := wd.execute(verb, rUrl, data); err != nil {
+		return err
+	}
+
+	// TODO: add a test for switching back to the original window.
+	if handle != startWindow && wd.w3cCompatible {
+		if err := wd.SwitchWindow(startWindow); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (wd *WebDriver) keyAction(action, keys string) error {
+	type keyAction struct {
+		Type string `json:"type"`
+		Key  string `json:"value"`
+	}
+	actions := make([]keyAction, 0, len(keys))
+	for _, key := range keys {
+		actions = append(actions, keyAction{
+			Type: action,
+			Key:  string(key),
+		})
+	}
+	return wd.voidCommand("/session/%s/actions", map[string]interface{}{
+		"actions": []interface{}{
+			map[string]interface{}{
+				"type":    "key",
+				"id":      "default keyboard",
+				"actions": actions,
+			}},
+	})
+}
+
+func (wd *WebDriver) execScriptRaw(script string, args []interface{}, suffix string) ([]byte, error) {
+	if args == nil {
+		args = make([]interface{}, 0)
+	}
+	data, err := json.Marshal(map[string]interface{}{
+		"script": script,
+		"args":   args,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return wd.execute("POST", wd.requestURL("/session/%s/execute"+suffix, wd.id), data)
+}
+
+func (wd *WebDriver) execScript(script string, args []interface{}, suffix string) (interface{}, error) {
+	response, err := wd.execScriptRaw(script, args, suffix)
+	if err != nil {
+		return nil, err
+	}
+	reply := new(struct{ Value interface{} })
+	if err = json.Unmarshal(response, reply); err != nil {
+		return nil, err
+	}
+	return reply.Value, nil
 }
