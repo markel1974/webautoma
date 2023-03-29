@@ -127,7 +127,9 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 		e.log(LogLevelCritical, err.Error())
 	}
 	event.Network, event.NetworkErrorCount = e.network.Compute(logEntries)
-	event.Acquired = e.network.Acquired()
+	if acquired := e.network.Acquired(); acquired != nil {
+		event.Acquired = acquired
+	}
 	if shot {
 		event.ScreenShoot = "probes-" + uuid.New().String()
 		if err := e.doScreenshot(event.ScreenShoot); err != nil {
@@ -160,9 +162,10 @@ func (e *Executor) doScreenshot(screenshotId string) error {
 		"id":         screenshotId,
 		"length":     len(screenshotData),
 		"screenshot": screenshotData,
-		//"business_id": e.bid,
 	}
-	imageEvent["acquired"] = e.network.Acquired()
+	if acquired := e.network.Acquired(); acquired != nil {
+		imageEvent["acquired"] = acquired
+	}
 	imageData, err := json.Marshal(imageEvent)
 	if err != nil {
 		return err
