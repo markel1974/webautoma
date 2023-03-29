@@ -52,6 +52,7 @@ type Executor struct {
 	network             *Network
 	templates           *Templates
 	cfg                 Config
+	stack               map[string]interface{}
 }
 
 func New(fileName string, logFile string, imgFile string, capture []string, variables map[string]interface{}) (*Executor, error) {
@@ -74,17 +75,18 @@ func New(fileName string, logFile string, imgFile string, capture []string, vari
 		maxRetry:            3,
 		timers:              make(map[string]*Timer),
 		probeId:             "",
+		stack:               nil,
 	}
 	var err error
-	e.logFile, err = e.templates.Apply(logFile)
+	e.logFile, err = e.templates.Apply(logFile, nil)
 	if err != nil {
 		return nil, err
 	}
-	e.imgFile, err = e.templates.Apply(imgFile)
+	e.imgFile, err = e.templates.Apply(imgFile, nil)
 	if err != nil {
 		return nil, err
 	}
-	e.cfgFile, err = e.templates.Apply(fileName)
+	e.cfgFile, err = e.templates.Apply(fileName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +120,9 @@ func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
 }
 
 func (e *Executor) createEvent(id string, kind string, err error, start time.Time, dur int64, shot bool) *Event {
+	if e.errorDisabled {
+		err = nil
+	}
 	event := NewEvent(id, kind, err, start, dur)
 	event.ProbeId = e.probeId
 	event.UUID = e.uuid
@@ -129,7 +134,7 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 	if acquired := e.network.Acquired(); acquired != nil {
 		event.Acquired = acquired
 	}
-	if shot {
+	if shot && err != nil {
 		event.ScreenShoot = "probes-" + uuid.New().String()
 		if err := e.doScreenshot(event.ScreenShoot); err != nil {
 			e.log(LogLevelCritical, "error generating screenshot: "+err.Error())
@@ -460,7 +465,7 @@ func (e *Executor) waitForMouse(target string, until string, value string) error
 	return err
 }
 
-func (e *Executor) waitForType(target string, data string) error {
+func (e *Executor) waitForTyping(target string, data string) error {
 	if len(data) <= 0 {
 		return nil
 	}
@@ -597,6 +602,49 @@ func (e *Executor) closeWindow() error {
 	return nil
 }
 
+func (e *Executor) createStack(target string, until string) {
+	e.stack = nil
+	v := 0
+	if len(until) > 0 {
+		v = 1
+	}
+	if analyzedElm := e.getElementByMode(target, v); analyzedElm != nil {
+		e.stack = make(map[string]interface{})
+		e.stack["_target"] = target
+		e.stack["_displayed"], _ = analyzedElm.IsDisplayed()
+		e.stack["_enabled"], _ = analyzedElm.IsEnabled()
+		e.stack["_text"], _ = analyzedElm.Text()
+		e.stack["_tagName"], _ = analyzedElm.TagName()
+	}
+}
+
+func (e *Executor) exists(target string, until string) error {
+	v := 0
+	if len(until) > 0 {
+		v = 1
+	}
+	if existsElm := e.getElementByMode(target, v); existsElm == nil {
+		return fmt.Errorf("element not exists")
+	}
+	return nil
+}
+
+func (e *Executor) until(target string, until string) error {
+	v := 0
+	if len(until) > 0 {
+		v = 1
+	}
+	if untilElm := e.getElementByMode(target, v); untilElm != nil {
+		return fmt.Errorf("element exists")
+	}
+	return nil
+}
+
+func (e *Executor) printStack() {
+	k, _ := json.Marshal(e.stack)
+	fmt.Println(string(k))
+}
+
 func (e *Executor) exec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -607,13 +655,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "probe":
 		e.probeId = target
 	case "until":
-		v := 0
-		if len(until) > 0 {
-			v = 1
-		}
-		if untilElm := e.getElementByMode(target, v); untilElm != nil {
-			err = fmt.Errorf("element exists")
-		}
+		err = e.until(target, until)
 	case "open":
 		//nothing to do
 	case "setWindowSize":
@@ -621,13 +663,11 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":
 		err = e.timerHandler(target, command, value)
 	case "exists":
-		v := 0
-		if len(until) > 0 {
-			v = 1
-		}
-		if existsElm := e.getElementByMode(target, v); existsElm == nil {
-			err = fmt.Errorf("element not exists")
-		}
+		err = e.exists(target, until)
+	case "createStack":
+		e.createStack(target, until)
+	case "printStack":
+		e.printStack()
 	case "disableError":
 		e.errorDisabled = true
 	case "enableError":
@@ -641,7 +681,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "mouseOut":
 		//nothing to do
 	case "type":
-		err = e.waitForType(target, value)
+		err = e.waitForTyping(target, value)
 	case "runScript":
 		err = e.waitForScript(target, nil)
 	case "humanWait":
@@ -662,14 +702,11 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	default:
 		e.log(LogLevelWarning, "unimplemented command: "+command)
 	}
-	if e.errorDisabled {
-		err = nil
-	}
-	var dur = UnixMilli(time.Now()) - UnixMilli(start)
-	var event = e.createEvent(e.fileId, "intermediate", err, start, dur, err != nil)
+
+	var event = e.createEvent(e.fileId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
 	event.Label = id
 	event.Target = target
-	event.Target = command
+	event.Command = command
 	e.logEvent(event)
 
 	return err
@@ -685,7 +722,6 @@ func (e *Executor) finalize(err error) {
 			e.logEvent(event)
 		}
 	}
-
 	var dur = UnixMilli(time.Now()) - UnixMilli(e.start)
 	var event = e.createEvent(e.fileId, "full", err, e.start, dur, false)
 	if err != nil {
@@ -693,12 +729,22 @@ func (e *Executor) finalize(err error) {
 	} else {
 		event.Message = "Esito sonda ok"
 	}
-
 	e.logEvent(event)
-
 	if e.quit {
 		_ = e.driver.Quit()
 	}
+}
+
+func (e *Executor) computeJump(target string, commands []ConfigCommand) (int, error) {
+	if len(target) == 0 {
+		return -1, fmt.Errorf("empty target")
+	}
+	for idx, cmd := range commands {
+		if cmd.Id == target {
+			return idx, nil
+		}
+	}
+	return -1, fmt.Errorf("undefined id: " + target)
 }
 
 func (e *Executor) Start(driver base.IWebDriver) error {
@@ -708,7 +754,7 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 
 	e.log(LogLevelInfo, "Sample started")
 
-	url, err := e.templates.Apply(e.cfg.Url)
+	url, err := e.templates.Apply(e.cfg.Url, nil)
 	if err != nil {
 		return err
 	}
@@ -725,24 +771,37 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 	e.log(LogLevelInfo, "mainWindow: "+e.mainWindow)
 
 	for _, test := range e.cfg.Tests {
-		for _, cmd := range test.Commands {
+		for x := 0; x < len(test.Commands); x++ {
+			cmd := test.Commands[x]
 			var err error
-			if cmd.Id, err = e.templates.Apply(cmd.Id); err != nil {
+			if cmd.Id, err = e.templates.Apply(cmd.Id, e.stack); err != nil {
 				return err
 			}
-			if cmd.Command, err = e.templates.Apply(cmd.Command); err != nil {
+			if cmd.Command, err = e.templates.Apply(cmd.Command, e.stack); err != nil {
 				return err
 			}
-			if cmd.Target, err = e.templates.Apply(cmd.Target); err != nil {
+			if cmd.Target, err = e.templates.Apply(cmd.Target, e.stack); err != nil {
 				return err
 			}
-			if cmd.Until, err = e.templates.Apply(cmd.Until); err != nil {
+			if cmd.Until, err = e.templates.Apply(cmd.Until, e.stack); err != nil {
 				return err
 			}
-			if cmd.Value, err = e.templates.Apply(cmd.Value); err != nil {
+			if cmd.Value, err = e.templates.Apply(cmd.Value, e.stack); err != nil {
 				return err
 			}
-			if err = e.exec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value); err != nil {
+			if cmd.Command == "jump" {
+				var jump int
+				jump, err = e.computeJump(cmd.Target, test.Commands)
+				if err == nil {
+					x = jump
+				}
+			} else {
+				err = e.exec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
+			}
+			if e.errorDisabled {
+				err = nil
+			}
+			if err != nil {
 				e.finalize(err)
 				return err
 			}
