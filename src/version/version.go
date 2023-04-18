@@ -1,7 +1,7 @@
 package version
 
 const MajorVersion = "1"
-const MinorVersion = "1"
+const MinorVersion = "2"
 const PatchVersion = "2"
 const AppVersionShort = MajorVersion + "." + MinorVersion + "." + PatchVersion + "." + BuildVersion
 const AppVersion = MajorVersion + "." + MinorVersion + "." + PatchVersion + "." + BuildVersion + " [" + BuildDate + "]"
