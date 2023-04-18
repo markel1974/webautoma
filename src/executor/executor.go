@@ -630,6 +630,25 @@ func (e *Executor) stackReset() {
 	e.stack = nil
 }
 
+func (e *Executor) assert(target string, until string, caption string) error {
+	v := 0
+	if len(until) > 0 {
+		v = 1
+	}
+	existsElm := e.getElementByMode(target, v)
+	if existsElm == nil {
+		return fmt.Errorf("element not exists")
+	}
+	text, err := existsElm.Text()
+	if err != nil {
+		return err
+	}
+	if text != caption {
+		return fmt.Errorf("different text %s -> %s", text, caption)
+	}
+	return nil
+}
+
 func (e *Executor) exists(target string, until string) error {
 	v := 0
 	if len(until) > 0 {
@@ -669,6 +688,8 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		//nothing to do
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":
 		err = e.timerHandler(target, command, value)
+	case "assert":
+		err = e.assert(target, until, value)
 	case "exists":
 		err = e.exists(target, until)
 	case "stackAdd":
@@ -726,7 +747,7 @@ func (e *Executor) finalize(err error) {
 		if !t.Finalized {
 			start := t.Start
 			dur := t.Finalize()
-			event := e.createEvent(t.Id, "full", nil, start, dur, false)
+			event := e.createEvent(t.Id, "full", err, start, dur, false)
 			event.Message = "timer not finalized"
 			e.logEvent(event)
 		}
@@ -811,7 +832,7 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 				err = nil
 			}
 			if err != nil {
-				e.finalize(err)
+				e.finalize(fmt.Errorf("%s (%s)", err.Error(), cmd.Id))
 				return err
 			}
 		}

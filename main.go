@@ -33,31 +33,27 @@ func createCapture(capture string) []string {
 	return strings.Split(capture, ",")
 }
 
-func createVariables(variables string) map[string]interface{} {
+func createVariables(variables string) (map[string]interface{}, error) {
 	if len(variables) == 0 {
-		return nil
+		return nil, nil
 	}
 	var varData map[string]interface{}
-	for _, v := range strings.Split(variables, ",") {
-		kv := strings.Split(v, "=")
-		if len(kv) < 2 {
-			continue
-		}
-		if varData == nil {
-			varData = make(map[string]interface{})
-		}
-		varData[strings.TrimSpace(kv[0])] = kv[1]
+	if err := json.Unmarshal([]byte(variables), &varData); err != nil {
+		return nil, err
 	}
-	return varData
+	return varData, nil
 }
 
-func launch(wdUrl *url.URL, sideFile string, resultFile string, imgFile string, capture string, variablesData map[string]interface{}) error {
+func launch(wdUrl *url.URL, sideFile string, resultFile string, imgFile string, capture string, variables string) error {
 	if len(resultFile) == 0 {
 		resultFile = defaultResultFile
 	}
-
 	if len(imgFile) == 0 {
 		imgFile = defaultImagesFile
+	}
+	variablesData, err := createVariables(variables)
+	if err != nil {
+		return err
 	}
 	captureData := createCapture(capture)
 	exec, err := executor.New(sideFile, resultFile, imgFile, captureData, variablesData)
@@ -152,44 +148,29 @@ func main() {
 		return
 	}
 
-	if len(variables) == 0 {
-		if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, nil); err != nil {
-			log.Fatal(err.Error())
+	if len(variables) > 0 && variables[0] == '@' {
+		variables = variables[1:]
+		file, err := os.OpenFile(variables, os.O_RDONLY, 0644)
+		if err != nil {
+			log.Println(err.Error())
+			return
 		}
-		return
-	}
-
-	if variables[0] != '@' {
-		variablesData := createVariables(variables)
-		if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, variablesData); err != nil {
-			log.Fatal(err.Error())
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer([]byte{}, bufio.MaxScanTokenSize*100)
+		counter := -1
+		for scanner.Scan() {
+			counter++
+			if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, scanner.Text()); err != nil {
+				log.Printf("line %d: %s", counter, err.Error())
+			}
 		}
-		return
-	}
-
-	variables = variables[1:]
-	file, err := os.OpenFile(variables, os.O_RDONLY, 0644)
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer([]byte{}, bufio.MaxScanTokenSize*100)
-	counter := -1
-	for scanner.Scan() {
-		counter++
-		var variablesData map[string]interface{}
-		line := scanner.Text()
-		if err := json.Unmarshal([]byte(line), &variablesData); err != nil {
-			log.Printf("line %d: %s", counter, err.Error())
-			continue
-		}
-		if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, variablesData); err != nil {
+		if scanner.Err() != nil {
 			log.Printf("line %d: %s", counter, err.Error())
 		}
-	}
-	if scanner.Err() != nil {
-		log.Printf("line %d: %s", counter, err.Error())
+	} else {
+		if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, variables); err != nil {
+			log.Fatal(err.Error())
+		}
 	}
 
 	/*
