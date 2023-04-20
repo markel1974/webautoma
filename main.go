@@ -76,6 +76,8 @@ func launch(wdUrl *url.URL, sideFile string, resultFile string, imgFile string, 
 }
 
 func main() {
+	//launcher.Start()
+	//os.Exit(-1)
 	var showHelp bool
 	var showVersion bool
 	var sideFile string
