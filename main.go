@@ -44,7 +44,7 @@ func createVariables(variables string) (map[string]interface{}, error) {
 	return varData, nil
 }
 
-func launch(wdUrl *url.URL, sideFile string, resultFile string, imgFile string, capture string, variables string) error {
+func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, capture string, variables string) error {
 	if len(resultFile) == 0 {
 		resultFile = defaultResultFile
 	}
@@ -62,6 +62,11 @@ func launch(wdUrl *url.URL, sideFile string, resultFile string, imgFile string, 
 	}
 	logType, logLevel := exec.RequiredLogs()
 	chromeCaps := chrome.Caps{}
+
+	//TEST
+	for _, arg := range args {
+		chromeCaps.Args = append(chromeCaps.Args, arg /*"headless"*/)
+	}
 	caps := base.Capabilities{}
 	caps.SetLogLevel(logType, logLevel)
 	caps.SetChrome(chromeCaps)
@@ -90,18 +95,21 @@ func main() {
 	var imgFile string
 	var capture string
 	var variables string
+	var driverArgs string
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
+	flag.StringVar(&driverArgs, "d", "", "webdriver args")
 	flag.StringVar(&sideFile, "x", "", "side file")
-	flag.StringVar(&urlBase, "b", "http://127.0.0.1", "web driver base url")
-	flag.StringVar(&urlPrefix, "u", "", "web driver prefix url")
-	flag.IntVar(&port, "p", 9515, "web driver port")
-	flag.StringVar(&wdPath, "s", "", "web driver service path")
+	flag.StringVar(&urlBase, "b", "http://127.0.0.1", "webdriver base url")
+	flag.StringVar(&urlPrefix, "u", "", "webdriver prefix url")
+	flag.IntVar(&port, "p", 9515, "webdriver port")
+	flag.StringVar(&wdPath, "s", "", "webdriver service path")
 	flag.BoolVar(&wdOnly, "w", false, "start webdriver only")
 	flag.StringVar(&resultFile, "l", defaultResultFile, "result file")
 	flag.StringVar(&imgFile, "i", defaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
+
 	flag.Parse()
 
 	if showHelp {
@@ -150,6 +158,13 @@ func main() {
 		return
 	}
 
+	var args []string
+	if len(driverArgs) > 0 {
+		for _, arg := range strings.Split(driverArgs, ";") {
+			args = append(args, arg)
+		}
+	}
+
 	if len(variables) > 0 && variables[0] == '@' {
 		variables = variables[1:]
 		file, err := os.OpenFile(variables, os.O_RDONLY, 0644)
@@ -162,7 +177,7 @@ func main() {
 		counter := -1
 		for scanner.Scan() {
 			counter++
-			if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, scanner.Text()); err != nil {
+			if err := launch(wdUrl, args, sideFile, resultFile, imgFile, capture, scanner.Text()); err != nil {
 				log.Printf("line %d: %s", counter, err.Error())
 			}
 		}
@@ -170,7 +185,7 @@ func main() {
 			log.Printf("line %d: %s", counter, err.Error())
 		}
 	} else {
-		if err := launch(wdUrl, sideFile, resultFile, imgFile, capture, variables); err != nil {
+		if err := launch(wdUrl, args, sideFile, resultFile, imgFile, capture, variables); err != nil {
 			log.Fatal(err.Error())
 		}
 	}
