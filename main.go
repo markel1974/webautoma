@@ -98,7 +98,7 @@ func main() {
 	var driverArgs string
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
-	flag.StringVar(&driverArgs, "d", "", "webdriver args")
+	flag.StringVar(&driverArgs, "d", "", "webdriver args (semicolon separated)")
 	flag.StringVar(&sideFile, "x", "", "side file")
 	flag.StringVar(&urlBase, "b", "http://127.0.0.1", "webdriver base url")
 	flag.StringVar(&urlPrefix, "u", "", "webdriver prefix url")
