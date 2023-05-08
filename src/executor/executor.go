@@ -126,9 +126,9 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 	event := NewEvent(id, kind, err, start, dur)
 	event.ProbeId = e.probeId
 	event.UUID = e.uuid
-	logEntries, err := e.driver.Log(base.LogPerformance)
-	if err != nil {
-		e.log(LogLevelCritical, err.Error())
+	logEntries, logErr := e.driver.Log(base.LogPerformance)
+	if logErr != nil {
+		e.log(LogLevelCritical, logErr.Error())
 	}
 	event.Network, event.NetworkErrorCount = e.network.Compute(logEntries)
 	if acquired := e.network.Acquired(); acquired != nil {
