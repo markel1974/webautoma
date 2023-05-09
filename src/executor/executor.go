@@ -28,6 +28,11 @@ const (
 	LogLevelCritical Loglevel = 2
 )
 
+const (
+	DefaultResultFile = "log.json"
+	DefaultImagesFile = "images.json"
+)
+
 type Executor struct {
 	cfgFile             string
 	logFile             string
@@ -53,16 +58,19 @@ type Executor struct {
 	templates           *Templates
 	cfg                 Config
 	stack               map[string]interface{}
+	imgDump             int
+	imgWidth            int
+	imgHeight           int
 }
 
-func New(fileName string, logFile string, imgFile string, capture []string, variables map[string]interface{}) (*Executor, error) {
+func New() *Executor {
 	e := &Executor{
-		logFile:             "",
-		imgFile:             "",
-		network:             NewNetwork(capture),
-		templates:           NewTemplates(variables),
+		logFile:             DefaultResultFile,
+		imgFile:             DefaultImagesFile,
+		network:             nil,
+		templates:           nil,
 		driver:              nil,
-		fileId:              computeFileId(fileName),
+		fileId:              "",
 		quit:                false,
 		retryInterval:       1000,
 		humanWaitBase:       150,
@@ -76,26 +84,58 @@ func New(fileName string, logFile string, imgFile string, capture []string, vari
 		timers:              make(map[string]*Timer),
 		probeId:             "",
 		stack:               nil,
+		imgDump:             0,
+		imgWidth:            1920,
+		imgHeight:           1080,
 	}
+	return e
+}
+
+func (e *Executor) SetImageDump() {
+	e.imgDump = 1
+}
+
+func (e *Executor) SetImageSize(w int, h int) {
+	if w > 0 && h > 0 {
+		e.imgWidth = w
+		e.imgHeight = h
+	}
+}
+
+func (e *Executor) SetLogFile(logFile string) {
+	if len(logFile) > 0 {
+		e.logFile = logFile
+	}
+}
+
+func (e *Executor) SetImageFile(imgFile string) {
+	if len(imgFile) > 0 {
+		e.imgFile = imgFile
+	}
+}
+
+func (e *Executor) Setup(fileName string, capture []string, variables map[string]interface{}) error {
 	var err error
-	e.logFile, err = e.templates.Apply(logFile, nil)
-	if err != nil {
-		return nil, err
+
+	e.network = NewNetwork(capture)
+	e.templates = NewTemplates(variables)
+	e.fileId = computeFileId(fileName)
+
+	if e.logFile, err = e.templates.Apply(e.logFile, nil); err != nil {
+		return err
 	}
-	e.imgFile, err = e.templates.Apply(imgFile, nil)
-	if err != nil {
-		return nil, err
+	if e.imgFile, err = e.templates.Apply(e.imgFile, nil); err != nil {
+		return err
 	}
-	e.cfgFile, err = e.templates.Apply(fileName, nil)
-	if err != nil {
-		return nil, err
+	if e.cfgFile, err = e.templates.Apply(fileName, nil); err != nil {
+		return err
 	}
 	fileData, err := ioutil.ReadFile(e.cfgFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := json.Unmarshal(fileData, &e.cfg); err != nil {
-		return nil, err
+		return err
 	}
 	if e.cfg.Timeout != nil {
 		e.wait = *e.cfg.Timeout
@@ -112,7 +152,7 @@ func New(fileName string, logFile string, imgFile string, capture []string, vari
 	if e.cfg.MaxScreenshotLength != nil {
 		e.maxScreenshotLength = *e.cfg.MaxScreenshotLength
 	}
-	return e, nil
+	return nil
 }
 
 func (e *Executor) RequiredLogs() (base.LogType, base.LogLevel) {
@@ -149,10 +189,21 @@ func (e *Executor) doScreenshot(screenshotId string) error {
 	if err != nil {
 		return err
 	}
-	scaled, err := Scale(screenshot, 1920, 1080)
+	scaled, err := Scale(screenshot, e.imgWidth, e.imgHeight, true)
 	if err != nil {
 		return err
 	}
+
+	if e.imgDump > 0 {
+		imgFile := time.Now().Format(RFC3339Milli) + "." + strconv.Itoa(e.imgDump) + ".png"
+		imgFile = strings.Replace(imgFile, ":", "-", -1)
+		if fi, fiErr := os.OpenFile(imgFile, os.O_CREATE|os.O_WRONLY, 0644); fiErr == nil {
+			_, _ = fi.Write(scaled)
+			fi.Close()
+		}
+		e.imgDump++
+	}
+
 	screenshotData := base64.StdEncoding.EncodeToString(scaled)
 	if e.useHtmlEncoding {
 		screenshotData = "data:image/png;base64," + screenshotData

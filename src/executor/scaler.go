@@ -7,7 +7,17 @@ import (
 	"image/png"
 )
 
-func Scale(buf []byte, x1 int, y1 int) ([]byte, error) {
+func AspectRatio(srcW int, srcH int, targetW int, targetH int) (int, int) {
+	if srcH <= 0 {
+		return targetW, targetW
+	}
+	r := float64(srcW) / float64(srcH)
+	widthT := float64(targetH) * r
+	heightT := widthT / r
+	return int(widthT), int(heightT)
+}
+
+func Scale(buf []byte, x1 int, y1 int, aspectRatio bool) ([]byte, error) {
 	reader := bytes.NewReader(buf)
 	img, _, err := image.Decode(reader)
 	if err != nil {
@@ -18,6 +28,12 @@ func Scale(buf []byte, x1 int, y1 int) ([]byte, error) {
 	//draw.BiLinear
 	//draw.CatmullRom
 	sc := draw.BiLinear
+
+	if aspectRatio {
+		s := img.Bounds().Size()
+		x1, y1 = AspectRatio(s.X, s.Y, x1, y1)
+	}
+
 	dr := image.Rect(0, 0, x1, y1)
 	res := scaleTo(img, dr, sc)
 

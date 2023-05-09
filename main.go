@@ -21,11 +21,6 @@ import (
 //go mod tidy
 //go mod vendor
 
-const (
-	defaultResultFile = "log.json"
-	defaultImagesFile = "images.json"
-)
-
 func createCapture(capture string) []string {
 	if len(capture) == 0 {
 		return nil
@@ -44,20 +39,24 @@ func createVariables(variables string) (map[string]interface{}, error) {
 	return varData, nil
 }
 
-func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, capture string, variables string) error {
-	if len(resultFile) == 0 {
-		resultFile = defaultResultFile
-	}
-	if len(imgFile) == 0 {
-		imgFile = defaultImagesFile
-	}
+func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, imgDump bool, capture string, variables string) error {
 	variablesData, err := createVariables(variables)
 	if err != nil {
 		return err
 	}
 	captureData := createCapture(capture)
-	exec, err := executor.New(sideFile, resultFile, imgFile, captureData, variablesData)
-	if err != nil {
+	exec := executor.New()
+
+	if len(resultFile) > 0 {
+		exec.SetLogFile(resultFile)
+	}
+	if len(imgFile) > 0 {
+		exec.SetImageFile(imgFile)
+	}
+	if imgDump {
+		exec.SetImageDump()
+	}
+	if err := exec.Setup(sideFile, captureData, variablesData); err != nil {
 		return err
 	}
 	logType, logLevel := exec.RequiredLogs()
@@ -96,6 +95,8 @@ func main() {
 	var capture string
 	var variables string
 	var driverArgs string
+	var imgDump bool
+
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&driverArgs, "d", "", "webdriver args (semicolon separated)")
@@ -105,10 +106,11 @@ func main() {
 	flag.IntVar(&port, "p", 9515, "webdriver port")
 	flag.StringVar(&wdPath, "s", "", "webdriver service path")
 	flag.BoolVar(&wdOnly, "w", false, "start webdriver only")
-	flag.StringVar(&resultFile, "l", defaultResultFile, "result file")
-	flag.StringVar(&imgFile, "i", defaultImagesFile, "images file")
+	flag.StringVar(&resultFile, "l", executor.DefaultResultFile, "result file")
+	flag.StringVar(&imgFile, "i", executor.DefaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
+	flag.BoolVar(&imgDump, "a", false, "image dump")
 
 	flag.Parse()
 
@@ -177,7 +179,7 @@ func main() {
 		counter := -1
 		for scanner.Scan() {
 			counter++
-			if err := launch(wdUrl, args, sideFile, resultFile, imgFile, capture, scanner.Text()); err != nil {
+			if err := launch(wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, scanner.Text()); err != nil {
 				log.Printf("line %d: %s", counter, err.Error())
 			}
 		}
@@ -185,7 +187,7 @@ func main() {
 			log.Printf("line %d: %s", counter, err.Error())
 		}
 	} else {
-		if err := launch(wdUrl, args, sideFile, resultFile, imgFile, capture, variables); err != nil {
+		if err := launch(wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, variables); err != nil {
 			log.Fatal(err.Error())
 		}
 	}
