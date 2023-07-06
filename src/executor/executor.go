@@ -39,6 +39,7 @@ type Executor struct {
 	imgFile             string
 	driver              base.IWebDriver
 	fileId              string
+	execId              string
 	start               time.Time
 	wait                int
 	retryInterval       int
@@ -120,6 +121,7 @@ func (e *Executor) Setup(fileName string, capture []string, variables map[string
 	e.network = NewNetwork(capture)
 	e.templates = NewTemplates(variables)
 	e.fileId = computeFileId(fileName)
+	e.execId = e.fileId
 
 	if e.logFile, err = e.templates.Apply(e.logFile, nil); err != nil {
 		return err
@@ -729,6 +731,8 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	e.humanWait()
 
 	switch command {
+	case "execId":
+		e.execId = target
 	case "probe":
 		e.probeId = target
 	case "until":
@@ -784,7 +788,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		e.log(LogLevelWarning, "unimplemented command: "+command)
 	}
 
-	var event = e.createEvent(e.fileId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
+	var event = e.createEvent(e.execId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
 	event.Label = id
 	event.Target = target
 	event.Command = command
@@ -804,7 +808,7 @@ func (e *Executor) finalize(err error) {
 		}
 	}
 	var dur = UnixMilli(time.Now()) - UnixMilli(e.start)
-	var event = e.createEvent(e.fileId, "full", err, e.start, dur, false)
+	var event = e.createEvent(e.execId, "full", err, e.start, dur, false)
 	if err != nil {
 		event.Message = "Errore nella sonda"
 	} else {
