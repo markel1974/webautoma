@@ -9,3 +9,5 @@ require (
 	github.com/mediabuyerbot/go-crx3 v1.3.1
 	golang.org/x/image v0.6.0
 )
+
+require google.golang.org/protobuf v1.26.0 // indirect
