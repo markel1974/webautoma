@@ -69,7 +69,7 @@ func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, i
 	caps := base.Capabilities{}
 	caps.SetLogLevel(logType, logLevel)
 	caps.SetChrome(chromeCaps)
-	driver := wd.NewWebDriver(caps, wdUrl, false)
+	driver := wd.NewWebDriver(nil, caps, wdUrl, false)
 	if err := driver.Start(); err != nil {
 		return err
 	}
