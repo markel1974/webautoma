@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/markel1974/webautoma/src/wd/base"
+	"io"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -86,11 +87,15 @@ type WebDriver struct {
 	debug          bool
 }
 
-func NewWebDriver(capabilities base.Capabilities, wdUrl *url.URL, debug bool) *WebDriver {
+func NewWebDriver(client *http.Client, capabilities base.Capabilities, wdUrl *url.URL, debug bool) *WebDriver {
+	if client == nil {
+		//client = http.DefaultClient
+		client = NewDefaultClient()
+	}
 	wd := &WebDriver{
 		urlPrefix:    wdUrl.String(),
 		capabilities: capabilities,
-		client:       http.DefaultClient,
+		client:       client,
 		debug:        debug,
 	}
 	if b := capabilities["browserName"]; b != nil {
@@ -792,23 +797,35 @@ func (wd *WebDriver) newRequest(method string, url string, data []byte) (*http.R
 	return request, nil
 }
 
-func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, error) {
+func (wd *WebDriver) execute(method string, url string, data []byte) (json.RawMessage, error) {
+	buildError := func(err error) error {
+		return fmt.Errorf("[method: %s] [url: %s] [error: %s]", method, url, err.Error())
+	}
 	request, err := wd.newRequest(method, url, data)
 	if err != nil {
-		return nil, err
+		return nil, buildError(err)
 	}
 
-	response, err := wd.client.Do(request)
+	var response *http.Response
+	var buf []byte
+
+	if response, err = wd.client.Do(request); err == nil {
+		if response.Body != nil {
+			buf, err = io.ReadAll(response.Body)
+			_ = response.Body.Close()
+		} else {
+			err = buildError(errors.New("empty body"))
+		}
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, buildError(err)
 	}
-
-	buf, err := ioutil.ReadAll(response.Body)
 
 	if wd.debug {
 		fmt.Printf("%s %s %s --> %s [%s]\n", method, url, data, response.Status, response.Header["Content-Type"])
 		if err != nil {
-			fmt.Println(err.Error())
+			fmt.Println(buildError(err))
 		} else {
 			var pretty bytes.Buffer
 			if err := json.Indent(&pretty, buf, "", "	"); err == nil {
@@ -820,35 +837,35 @@ func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, 
 	}
 
 	if err != nil {
-		return nil, errors.New(response.Status)
+		return nil, buildError(errors.New(response.Status))
 	}
 
 	fullCType := response.Header.Get("Content-Type")
 	cType, _, err := mime.ParseMediaType(fullCType)
 	if err != nil {
-		return nil, fmt.Errorf("got content type header %q, expected %q", fullCType, DefaultContentType)
+		return nil, buildError(fmt.Errorf("got content type header %q, expected %q", fullCType, DefaultContentType))
 	}
 	if cType != DefaultContentType {
-		return nil, fmt.Errorf("got content type %q, expected %q", cType, DefaultContentType)
+		return nil, buildError(fmt.Errorf("got content type %q, expected %q", cType, DefaultContentType))
 	}
 
 	reply := new(ServerReply)
-	if err := json.Unmarshal(buf, reply); err != nil {
+	if err = json.Unmarshal(buf, reply); err != nil {
 		if response.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("bad server reply status: %s", response.Status)
+			return nil, buildError(fmt.Errorf("bad server reply status: %s", response.Status))
 		}
-		return nil, err
+		return nil, buildError(err)
 	}
 	if reply.Err != "" {
-		return nil, &reply.Error
+		return nil, buildError(&reply.Error)
 	}
 
 	// Handle the W3C-compliant error format. In the W3C spec, the error is embedded in the 'value' field.
 	if len(reply.Value) > 0 {
 		respErr := new(base.Error)
-		if err := json.Unmarshal(reply.Value, respErr); err == nil && respErr.Err != "" {
+		if err = json.Unmarshal(reply.Value, respErr); err == nil && respErr.Err != "" {
 			respErr.HTTPCode = response.StatusCode
-			return nil, respErr
+			return nil, buildError(respErr)
 		}
 	}
 
@@ -859,12 +876,11 @@ func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, 
 		if !ok {
 			shortMsg = fmt.Sprintf("unknown error - %d", reply.Status)
 		}
-
 		longMsg := new(struct {
 			Message string
 		})
-		if err := json.Unmarshal(reply.Value, longMsg); err != nil {
-			return nil, errors.New(shortMsg)
+		if err = json.Unmarshal(reply.Value, longMsg); err != nil {
+			return nil, buildError(errors.New(shortMsg))
 		}
 		return nil, &base.Error{
 			Err:        shortMsg,
@@ -873,7 +889,6 @@ func (wd *WebDriver) execute(method, url string, data []byte) (json.RawMessage, 
 			LegacyCode: reply.Status,
 		}
 	}
-
 	return buf, nil
 }
 
