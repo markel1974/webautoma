@@ -575,6 +575,26 @@ func (e *Executor) loadUrl(url string) error {
 	return nil
 }
 
+func (e *Executor) selectFrame(target string) error {
+	var frame interface{}
+	if elm := e.getElementByMode(target, 2); elm != nil {
+		frame = elm
+	} else {
+		frame = target
+	}
+	if v := e.driver.SwitchFrame(frame); v == nil {
+		return fmt.Errorf("invalid frame")
+	}
+	return nil
+}
+
+func (e *Executor) selectParentFrame() error {
+	if v := e.driver.SwitchParentFrame(); v == nil {
+		return fmt.Errorf("invalid frame")
+	}
+	return nil
+}
+
 func (e *Executor) selectWindowMain() error {
 	if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
 		return fmt.Errorf("invalid mainWindow")
@@ -775,6 +795,10 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		err = e.selectWindowMain()
 	case "selectWindowTitle":
 		err = e.selectWindowTitle(value)
+	case "selectFrame":
+		err = e.selectFrame(target)
+	case "selectParentFrame":
+		err = e.selectParentFrame()
 	case "selectAlert":
 		err = e.selectAlert(parseInt(value))
 	case "closeWindow":

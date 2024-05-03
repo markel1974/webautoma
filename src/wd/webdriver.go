@@ -1,5 +1,7 @@
 // See https://www.w3.org/TR/webdriver for the protocol.
 
+// https://github.com/hupe1980/gowebdriver
+
 package wd
 
 import (
@@ -436,16 +438,6 @@ func (wd *WebDriver) Close() error {
 	return err
 }
 
-func (wd *WebDriver) SwitchWindow(handle string) error {
-	params := make(map[string]string)
-	if !wd.w3cCompatible {
-		params["name"] = handle
-	} else {
-		params["handle"] = handle
-	}
-	return wd.voidCommand("/session/%s/window", params)
-}
-
 func (wd *WebDriver) CloseWindow(name string) error {
 	return wd.modifyWindow(name, "DELETE", "", nil)
 }
@@ -483,6 +475,7 @@ func (wd *WebDriver) ResizeWindow(name string, width, height int) error {
 	})
 }
 
+// SwitchFrame changes focus to another frame on the page.
 func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 	params := map[string]interface{}{}
 	switch f := frame.(type) {
@@ -504,6 +497,23 @@ func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 		return fmt.Errorf("invalid type %T", frame)
 	}
 	return wd.voidCommand("/session/%s/frame", params)
+}
+
+// SwitchWindow changes focus to another window. The window to change focus to may be specified
+// by it's server assigned window handle.
+func (wd *WebDriver) SwitchWindow(handle string) error {
+	params := make(map[string]string)
+	if !wd.w3cCompatible {
+		params["name"] = handle
+	} else {
+		params["handle"] = handle
+	}
+	return wd.voidCommand("/session/%s/window", params)
+}
+
+// SwitchParentFrame changes focus to parent frame on the page.
+func (wd *WebDriver) SwitchParentFrame() error {
+	return wd.voidCommand("/session/%s/frame/parent", wd.SessionID())
 }
 
 func (wd *WebDriver) ActiveElement() (base.IWebElement, error) {

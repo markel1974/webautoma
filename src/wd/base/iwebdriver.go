@@ -61,6 +61,9 @@ type IWebDriver interface {
 	// GetElement, or nil to switch to the current top-level browsing context.
 	SwitchFrame(frame interface{}) error
 
+	// SwitchParentFrame switches to the parent frame.
+	SwitchParentFrame() error
+
 	// SwitchWindow switches the context to the specified window.
 	SwitchWindow(handle string) error
 
@@ -75,10 +78,10 @@ type IWebDriver interface {
 	// current window will be maximized.
 	ResizeWindow(handle string, width, height int) error
 
-	// Navigates the browser to the provided URL.
+	// Navigate Navigates the browser to the provided URL.
 	Navigate(url string) error
 
-	// Forward moves forward in history.
+	// Forward Forward moves forward in history.
 	Forward() error
 
 	// Back moves backward in history.
