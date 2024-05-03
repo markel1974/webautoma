@@ -577,13 +577,31 @@ func (e *Executor) loadUrl(url string) error {
 
 func (e *Executor) selectFrame(target string) error {
 	var frame interface{}
-	if elm := e.getElementByMode(target, 2); elm != nil {
-		frame = elm
+	if v := strings.Split(target, "="); len(v) >= 2 {
+		switch strings.ToLower(strings.TrimSpace(v[0])) {
+		case "index":
+			var err error
+			if frame, err = strconv.Atoi(v[1]); err != nil {
+				return err
+			}
+		case "relative":
+			frame = v[1]
+		default:
+			frame = v[1]
+		}
 	} else {
-		frame = target
+		frame = ""
 	}
-	if v := e.driver.SwitchFrame(frame); v == nil {
-		return fmt.Errorf("invalid frame")
+
+	//var frame interface{}
+	//if elm := e.getElementByMode(target, 2); elm != nil {
+	//	frame = elm
+	//} else {
+	//	frame = target
+	//}
+
+	if err := e.driver.SwitchFrame(frame); err != nil {
+		return err
 	}
 	return nil
 }

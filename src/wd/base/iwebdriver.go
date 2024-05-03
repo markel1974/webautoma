@@ -93,7 +93,7 @@ type IWebDriver interface {
 	// FindElement finds exactly one element in the current page's DOM.
 	FindElement(by string, value string) (IWebElement, error)
 
-	// FindElement finds potentially many elements in the current page's DOM.
+	// FindElements finds potentially many elements in the current page's DOM.
 	FindElements(by string, value string) ([]IWebElement, error)
 
 	// ActiveElement returns the currently active element on the page.
@@ -197,6 +197,7 @@ type IWebDriver interface {
 
 	// ExecuteScriptRaw executes a script but does not perform JSON decoding.
 	ExecuteScriptRaw(script string, args []interface{}) ([]byte, error)
+
 	// ExecuteScriptAsyncRaw asynchronously executes a script but does not
 	// perform JSON decoding.
 	ExecuteScriptAsyncRaw(script string, args []interface{}) ([]byte, error)

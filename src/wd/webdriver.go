@@ -344,8 +344,13 @@ func (wd *WebDriver) CurrentURL() (string, error) {
 }
 
 func (wd *WebDriver) Navigate(rUrl string) error {
-	if !strings.HasPrefix(strings.ToLower(rUrl), "http") {
-		rUrl = "https://" + rUrl
+	lowerUrl := strings.ToLower(rUrl)
+	if strings.HasPrefix(lowerUrl, "file") {
+		//
+	} else {
+		if !strings.HasPrefix(lowerUrl, "http") {
+			rUrl = "https://" + rUrl
+		}
 	}
 	rUrl = strings.TrimSpace(rUrl)
 	requestURL := wd.requestURL("/session/%s/url", wd.id)
@@ -496,7 +501,12 @@ func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 	default:
 		return fmt.Errorf("invalid type %T", frame)
 	}
-	return wd.voidCommand("/session/%s/frame", params)
+	err := wd.voidCommand("/session/%s/frame", params)
+	if err != nil {
+		return err //fmt.Errorf(err.Error())
+	}
+	return nil
+	//return wd.voidCommand("/session/%s/frame", params)
 }
 
 // SwitchWindow changes focus to another window. The window to change focus to may be specified
@@ -922,7 +932,8 @@ func (wd *WebDriver) stringCommand(urlTemplate string) (string, error) {
 }
 
 func (wd *WebDriver) voidCommand(urlTemplate string, params interface{}) error {
-	return wd.voidParamsCommand("POST", wd.requestURL(urlTemplate, wd.id), params)
+	err := wd.voidParamsCommand("POST", wd.requestURL(urlTemplate, wd.id), params)
+	return err
 }
 
 func (wd *WebDriver) voidParamsCommand(method, url string, params interface{}) error {

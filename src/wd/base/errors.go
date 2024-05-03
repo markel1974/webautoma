@@ -25,7 +25,7 @@ var RemoteErrors = map[int]string{
 	32: "invalid selector",
 }
 
-// see https://www.w3.org/TR/webdriver/#handling-errors .
+// Error see https://www.w3.org/TR/webdriver/#handling-errors .
 type Error struct {
 	Err        string `json:"error"`
 	Message    string `json:"message"`
