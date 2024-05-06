@@ -503,10 +503,9 @@ func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 	}
 	err := wd.voidCommand("/session/%s/frame", params)
 	if err != nil {
-		return err //fmt.Errorf(err.Error())
+		return err
 	}
 	return nil
-	//return wd.voidCommand("/session/%s/frame", params)
 }
 
 // SwitchWindow changes focus to another window. The window to change focus to may be specified
@@ -805,7 +804,8 @@ func (wd *WebDriver) Log(kind base.LogType) ([]base.LogMessage, error) {
 }
 
 func (wd *WebDriver) requestURL(template string, args ...interface{}) string {
-	return wd.urlPrefix + fmt.Sprintf(template, args...)
+	u := wd.urlPrefix + fmt.Sprintf(template, args...)
+	return u
 }
 
 func (wd *WebDriver) newRequest(method string, url string, data []byte) (*http.Request, error) {

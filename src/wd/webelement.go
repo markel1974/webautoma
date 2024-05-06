@@ -200,3 +200,18 @@ func (elem *WebElement) Size() (*base.Size, error) {
 
 	return &base.Size{Width: rect.Width, Height: rect.Height}, nil
 }
+
+func (elem *WebElement) Print() {
+	text, _ := elem.Text()
+	size, _ := elem.Size()
+	isDisplayed, _ := elem.IsDisplayed()
+	isEnabled, _ := elem.IsEnabled()
+	isSelected, _ := elem.IsSelected()
+	tagName, _ := elem.TagName()
+	fmt.Printf("text: %s\n", text)
+	fmt.Printf("size: w: %f h: %f\n", size.Width, size.Height)
+	fmt.Printf("isEnabled: %v\n", isEnabled)
+	fmt.Printf("isDisplayed: %v\n", isDisplayed)
+	fmt.Printf("isSelected: %v\n", isSelected)
+	fmt.Printf("tagName: %s\n", tagName)
+}

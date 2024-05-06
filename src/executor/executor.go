@@ -3,6 +3,7 @@ package executor
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -327,7 +328,7 @@ func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
 			found = elem != nil
 		} else if until == 1 {
 			if elem != nil {
-				if !e.isElementReady(elem) {
+				if !e.isElementReady(target, elem) {
 					found = true
 					elem = nil
 				}
@@ -336,7 +337,7 @@ func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
 			}
 		} else {
 			if elem != nil {
-				if e.isElementReady(elem) {
+				if e.isElementReady(target, elem) {
 					found = true
 				}
 			}
@@ -368,23 +369,23 @@ func (e *Executor) findElement(by string, data string) base.IWebElement {
 	return elm
 }
 
-func (e *Executor) isElementReady(elm base.IWebElement) bool {
+func (e *Executor) isElementReady(target string, elm base.IWebElement) bool {
 	ok, err := elm.IsEnabled()
 	if err != nil {
-		e.log(LogLevelDebug, "isElementReady (IsEnabled): "+err.Error())
+		e.log(LogLevelDebug, fmt.Sprintf("(%s) isElementReady : %s", target, err.Error()))
 		return false
 	}
 	if !ok {
-		e.log(LogLevelDebug, "isElementReady: element isn't enabled")
+		e.log(LogLevelDebug, fmt.Sprintf("(%s) isElementReady: element isn't enabled", target))
 		return false
 	}
 	ok, err = elm.IsDisplayed()
 	if err != nil {
-		e.log(LogLevelDebug, "isElementReady (IsDisplayed): "+err.Error())
+		e.log(LogLevelDebug, fmt.Sprintf("(%s) isElementReady (IsDisplayed): %s", target, err.Error()))
 		return false
 	}
 	if !ok {
-		e.log(LogLevelDebug, "isElementReady: element isn't displayed")
+		e.log(LogLevelDebug, fmt.Sprintf("(%s) isElementReady: element isn't displayed", target))
 		return false
 	}
 	return true
@@ -426,7 +427,7 @@ func (e *Executor) waitForMouse(target string, until string, value string) error
 	var start = UnixMilli(time.Now())
 	var elm = e.getElementByMode(target, 2)
 	if elm == nil {
-		return fmt.Errorf("element isn't ready")
+		return fmt.Errorf("element isn't ready (%s)", target)
 	}
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
@@ -535,8 +536,8 @@ func (e *Executor) waitForTyping(target string, data string) error {
 		err = nil
 		if err = elm.SendKeys(string(data[pos])); err != nil {
 			if elm = e.getElementByMode(target, 2); elm == nil {
-				e.log(LogLevelDebug, "waitForType: element isn't ready, returning...")
-				return fmt.Errorf("element isn't ready")
+				e.log(LogLevelDebug, fmt.Sprintf("(%s) waitForType: element isn't ready", target))
+				return errors.New("element isn't ready")
 			}
 		}
 
@@ -762,6 +763,16 @@ func (e *Executor) until(target string, until string) error {
 	return nil
 }
 
+func (e *Executor) activeElement(id string) error {
+	v, err := e.driver.ActiveElement()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s ActiveElement =>\n", id)
+	v.Print()
+	return nil
+}
+
 func (e *Executor) exec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -826,6 +837,32 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		//e.actions.sendKeys(value).perform()
 	case "setTimeout":
 		e.wait = parseInt(value)
+	case "activeElement":
+		err = e.activeElement(id)
+	case "pageSource":
+		v, _ := e.driver.PageSource()
+		fmt.Printf("%s PageSource =>\n", id)
+		fmt.Println(v)
+	case "getAllCookies":
+		v, _ := e.driver.GetCookies()
+		fmt.Printf("%s Cookies =>\n", id)
+		fmt.Println(v)
+	case "getCookie":
+		v, _ := e.driver.GetCookie(target)
+		fmt.Printf("%s Cookie =>\n", id)
+		fmt.Println(v)
+	case "deleteAllCookies":
+		err = e.driver.DeleteAllCookies()
+	case "deleteCookie":
+		err = e.driver.DeleteCookie(target)
+	case "windowHandles":
+		fmt.Printf("%s WindowHandles =>\n", id)
+		v, _ := e.driver.WindowHandles()
+		fmt.Println(v)
+	case "status":
+		fmt.Printf("%s Status =>\n", id)
+		k, _ := e.driver.Status()
+		fmt.Println(k)
 	default:
 		e.log(LogLevelWarning, "unimplemented command: "+command)
 	}

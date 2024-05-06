@@ -1,6 +1,6 @@
 package base
 
-// WebElement defines method supported by web elements.
+// IWebElement defines method supported by web elements.
 type IWebElement interface {
 
 	// Click clicks on the element.
@@ -22,7 +22,7 @@ type IWebElement interface {
 	// FindElement finds a child element.
 	FindElement(by string, value string) (IWebElement, error)
 
-	// FindElement finds multiple children elements.
+	// FindElements finds multiple children elements.
 	FindElements(by string, value string) ([]IWebElement, error)
 
 	// TagName returns the element's name.
@@ -61,6 +61,9 @@ type IWebElement interface {
 	// element.
 	CSSProperty(name string) (string, error)
 
-	// Screenshot takes a screenshot of the attribute scroll'ing if necessary.
+	// Screenshot takes a screenshot of the attribute scrolling if necessary.
 	Screenshot(scroll bool) ([]byte, error)
+
+	// Print information
+	Print()
 }
