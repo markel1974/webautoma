@@ -19,6 +19,9 @@ type IWebElement interface {
 	// the element is not visible, it will be scrolled into view.
 	MoveTo(xOffset float64, yOffset float64) error
 
+	// ComputedLabel ...
+	ComputedLabel() (string, error)
+
 	// FindElement finds a child element.
 	FindElement(by string, value string) (IWebElement, error)
 

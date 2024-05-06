@@ -90,6 +90,9 @@ type IWebDriver interface {
 	// Refresh refreshes the page.
 	Refresh() error
 
+	// ComputedLabel ...
+	ComputedLabel() (string, error)
+
 	// FindElement finds exactly one element in the current page's DOM.
 	FindElement(by string, value string) (IWebElement, error)
 

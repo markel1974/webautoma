@@ -763,6 +763,37 @@ func (e *Executor) until(target string, until string) error {
 	return nil
 }
 
+func (e *Executor) selectOption(target string, value string) error {
+	v := strings.Split(value, "=")
+	if len(v) < 2 {
+		return fmt.Errorf("invalid value")
+	}
+	by := v[0]
+	if by != "label" {
+		return fmt.Errorf("unsupported by")
+	}
+	label := v[1]
+	elm := e.getElementByMode(target, 2)
+	if elm == nil {
+		return fmt.Errorf("element isn't ready")
+	}
+	z, err := elm.FindElements(base.ByTagName, "option")
+	if err != nil {
+		return err
+	}
+	for _, k := range z {
+		computedLabel, err := k.ComputedLabel()
+		if err != nil {
+			continue
+		}
+		if computedLabel == label {
+			return k.Click()
+		}
+
+	}
+	return fmt.Errorf("not found")
+}
+
 func (e *Executor) activeElement(id string) error {
 	v, err := e.driver.ActiveElement()
 	if err != nil {
@@ -820,6 +851,8 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 		err = e.waitForScript(target, nil)
 	case "humanWait":
 		e.doSleep(parseInt(value))
+	case "select":
+		err = e.selectOption(target, value)
 	case "selectWindowMain":
 		err = e.selectWindowMain()
 	case "selectWindowTitle":

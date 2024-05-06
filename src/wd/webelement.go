@@ -63,13 +63,18 @@ func (elem *WebElement) MoveTo(xOffset float64, yOffset float64) error {
 	})
 }
 
+func (elem *WebElement) ComputedLabel() (string, error) {
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/computedlabel", elem.id)
+	response, err := elem.parent.computedLabel(rUrl)
+	return response, err
+}
+
 func (elem *WebElement) FindElement(by string, value string) (base.IWebElement, error) {
 	rUrl := fmt.Sprintf("/session/%%s/element/%s/element", elem.id)
 	response, err := elem.parent.find(by, value, "", rUrl)
 	if err != nil {
 		return nil, err
 	}
-
 	return elem.parent.DecodeElement(response)
 }
 

@@ -420,6 +420,11 @@ func (wd *WebDriver) DecodeElements(data []byte) ([]base.IWebElement, error) {
 	return elements, nil
 }
 
+func (wd *WebDriver) ComputedLabel() (string, error) {
+	response, err := wd.computedLabel("")
+	return response, err
+}
+
 func (wd *WebDriver) FindElement(by, value string) (base.IWebElement, error) {
 	response, err := wd.find(by, value, "", "")
 	if err != nil {
@@ -970,6 +975,18 @@ func (wd *WebDriver) boolCommand(urlTemplate string) (bool, error) {
 	reply := new(struct{ Value bool })
 	if err := json.Unmarshal(response, reply); err != nil {
 		return false, err
+	}
+	return reply.Value, nil
+}
+
+func (wd *WebDriver) computedLabel(url string) (string, error) {
+	response, err := wd.execute("GET", wd.requestURL(url, wd.id), nil)
+	if err != nil {
+		return "", err
+	}
+	reply := new(struct{ Value string })
+	if err := json.Unmarshal(response, reply); err != nil {
+		return "", err
 	}
 	return reply.Value, nil
 }
