@@ -187,6 +187,13 @@ func (e *Executor) createEvent(id string, kind string, err error, start time.Tim
 	return event
 }
 
+func (e *Executor) loadUrl(url string) error {
+	if err := e.driver.Navigate(url); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (e *Executor) doScreenshot(screenshotId string) error {
 	//480p = 858 x 480 - 720p = 1280 x 720 - 1080p = 1920 x 1080 — FullHD
 	screenshot, err := e.driver.Screenshot()
@@ -570,13 +577,6 @@ func (e *Executor) doRunScript(script string, args []interface{}) error {
 	return err
 }
 
-func (e *Executor) loadUrl(url string) error {
-	if err := e.driver.Navigate(url); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (e *Executor) doSelectFrame(target string) error {
 	var frame interface{}
 	if v := strings.Split(target, "="); len(v) >= 2 {
@@ -936,7 +936,7 @@ func (e *Executor) doProbeId(target string) error {
 	return nil
 }
 
-func (e *Executor) exec(id string, command string, target string, until string, value string) error {
+func (e *Executor) commandExec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
 
@@ -1063,7 +1063,7 @@ func (e *Executor) finalize(err error) {
 	}
 }
 
-func (e *Executor) computeJump(target string, commands []ConfigCommand) (int, error) {
+func (e *Executor) doComputeJump(target string, commands []ConfigCommand) (int, error) {
 	if len(target) == 0 {
 		return -1, fmt.Errorf("empty target")
 	}
@@ -1075,8 +1075,37 @@ func (e *Executor) computeJump(target string, commands []ConfigCommand) (int, er
 	return -1, fmt.Errorf("undefined id: " + target)
 }
 
+func (e *Executor) commandsLoop() (string, error) {
+	for _, test := range e.cfg.Tests {
+		for x := 0; x < len(test.Commands); x++ {
+			cmd := test.Commands[x]
+			err := e.templates.BuildCommand(cmd, e.stack)
+			if err != nil {
+				return cmd.Id, err
+			}
+			if cmd.Command == "jump" {
+				var jump int
+				if jump, err = e.doComputeJump(cmd.Target, test.Commands); err == nil {
+					x = jump
+				}
+			} else {
+				if len(cmd.WindowHandleName) > 0 {
+					e.windowHandles.Add(e.driver, cmd)
+				}
+				err = e.commandExec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
+			}
+			if e.errorDisabled {
+				err = nil
+			}
+			if err != nil {
+				return cmd.Id, err
+			}
+		}
+	}
+	return "", nil
+}
+
 func (e *Executor) Start(driver base.IWebDriver) error {
-	var err error
 	e.driver = driver
 	e.start = time.Now()
 
@@ -1086,58 +1115,23 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 	if err != nil {
 		return err
 	}
-	if err := e.loadUrl(url); err != nil {
+	if err = e.loadUrl(url); err != nil {
 		e.finalize(err)
 		return err
 	}
-	e.mainWindow, err = e.driver.CurrentWindowHandle()
-	if err != nil {
+	if e.mainWindow, err = e.driver.CurrentWindowHandle(); err != nil {
 		e.finalize(err)
 		return err
 	}
 
 	e.log(LogLevelInfo, "mainWindow: "+e.mainWindow)
 
-	for _, test := range e.cfg.Tests {
-		for x := 0; x < len(test.Commands); x++ {
-			cmd := test.Commands[x]
-			var err error
-			if cmd.Id, err = e.templates.Apply(cmd.Id, e.stack); err != nil {
-				return err
-			}
-			if cmd.Command, err = e.templates.Apply(cmd.Command, e.stack); err != nil {
-				return err
-			}
-			if cmd.Target, err = e.templates.Apply(cmd.Target, e.stack); err != nil {
-				return err
-			}
-			if cmd.Until, err = e.templates.Apply(cmd.Until, e.stack); err != nil {
-				return err
-			}
-			if cmd.Value, err = e.templates.Apply(cmd.Value, e.stack); err != nil {
-				return err
-			}
-			if cmd.Command == "jump" {
-				var jump int
-				jump, err = e.computeJump(cmd.Target, test.Commands)
-				if err == nil {
-					x = jump
-				}
-			} else {
-				if len(cmd.WindowHandleName) > 0 {
-					e.windowHandles.Add(e.driver, cmd)
-				}
-				err = e.exec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
-			}
-			if e.errorDisabled {
-				err = nil
-			}
-			if err != nil {
-				e.finalize(fmt.Errorf("%s (%s)", err.Error(), cmd.Id))
-				return err
-			}
-		}
+	var id string
+	if id, err = e.commandsLoop(); err != nil {
+		e.finalize(fmt.Errorf("%s (%s)", err.Error(), id))
+		return err
 	}
+
 	e.finalize(nil)
 	return nil
 }

@@ -64,3 +64,23 @@ func (t *Templates) joinMaps(in1 map[string]interface{}, in2 map[string]interfac
 	}
 	return joined
 }
+
+func (t *Templates) BuildCommand(cmd ConfigCommand, stack map[string]interface{}) error {
+	var err error
+	if cmd.Id, err = t.Apply(cmd.Id, stack); err != nil {
+		return err
+	}
+	if cmd.Command, err = t.Apply(cmd.Command, stack); err != nil {
+		return err
+	}
+	if cmd.Target, err = t.Apply(cmd.Target, stack); err != nil {
+		return err
+	}
+	if cmd.Until, err = t.Apply(cmd.Until, stack); err != nil {
+		return err
+	}
+	if cmd.Value, err = t.Apply(cmd.Value, stack); err != nil {
+		return err
+	}
+	return nil
+}
