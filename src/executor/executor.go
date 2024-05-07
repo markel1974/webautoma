@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -63,6 +62,7 @@ type Executor struct {
 	imgDump             int
 	imgWidth            int
 	imgHeight           int
+	windowHandles       *Windows
 }
 
 func New() *Executor {
@@ -89,6 +89,7 @@ func New() *Executor {
 		imgDump:             0,
 		imgWidth:            1920,
 		imgHeight:           1080,
+		windowHandles:       NewWindows(),
 	}
 	return e
 }
@@ -133,7 +134,7 @@ func (e *Executor) Setup(fileName string, capture []string, variables map[string
 	if e.cfgFile, err = e.templates.Apply(fileName, nil); err != nil {
 		return err
 	}
-	fileData, err := ioutil.ReadFile(e.cfgFile)
+	fileData, err := os.ReadFile(e.cfgFile)
 	if err != nil {
 		return err
 	}
@@ -283,7 +284,7 @@ func (e *Executor) logEvent(event *Event) {
 	e.doWriteLog(string(message))
 }
 
-func (e *Executor) doSleep(interval int) {
+func (e *Executor) sleep(interval int) {
 	time.Sleep(time.Millisecond * time.Duration(interval))
 }
 
@@ -291,7 +292,7 @@ func (e *Executor) humanWait() {
 	rnd := rand.Float64()
 	val := math.Round(rnd * 100)
 	interval := e.humanWaitBase + int(val)
-	e.doSleep(interval)
+	e.sleep(interval)
 }
 
 func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
@@ -345,7 +346,7 @@ func (e *Executor) getElementByMode(target string, until int) base.IWebElement {
 		if found {
 			break
 		} else {
-			e.doSleep(e.retryInterval)
+			e.sleep(e.retryInterval)
 		}
 	}
 
@@ -391,7 +392,7 @@ func (e *Executor) isElementReady(target string, elm base.IWebElement) bool {
 	return true
 }
 
-func (e *Executor) timerHandler(target string, until string, value string) error {
+func (e *Executor) doTimer(target string, until string, value string) error {
 	switch until {
 	case "timerCreate":
 		e.timers[target] = NewTimer(target, value)
@@ -422,7 +423,7 @@ func (e *Executor) timerHandler(target string, until string, value string) error
 	return nil
 }
 
-func (e *Executor) waitForMouse(target string, until string, value string) error {
+func (e *Executor) doMouse(target string, until string, value string) error {
 	var err error
 	var start = UnixMilli(time.Now())
 	var elm = e.getElementByMode(target, 2)
@@ -513,13 +514,13 @@ func (e *Executor) waitForMouse(target string, until string, value string) error
 		if err == nil {
 			break
 		} else {
-			e.doSleep(e.retryInterval)
+			e.sleep(e.retryInterval)
 		}
 	}
 	return err
 }
 
-func (e *Executor) waitForTyping(target string, data string) error {
+func (e *Executor) doType(target string, data string) error {
 	if len(data) <= 0 {
 		return nil
 	}
@@ -549,13 +550,13 @@ func (e *Executor) waitForTyping(target string, data string) error {
 				break
 			}
 		} else {
-			e.doSleep(e.retryInterval)
+			e.sleep(e.retryInterval)
 		}
 	}
 	return err
 }
 
-func (e *Executor) waitForScript(script string, args []interface{}) error {
+func (e *Executor) doRunScript(script string, args []interface{}) error {
 	var err error
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
@@ -563,7 +564,7 @@ func (e *Executor) waitForScript(script string, args []interface{}) error {
 		if err == nil {
 			break
 		} else {
-			e.doSleep(e.retryInterval)
+			e.sleep(e.retryInterval)
 		}
 	}
 	return err
@@ -576,7 +577,7 @@ func (e *Executor) loadUrl(url string) error {
 	return nil
 }
 
-func (e *Executor) selectFrame(target string) error {
+func (e *Executor) doSelectFrame(target string) error {
 	var frame interface{}
 	if v := strings.Split(target, "="); len(v) >= 2 {
 		switch strings.ToLower(strings.TrimSpace(v[0])) {
@@ -607,21 +608,21 @@ func (e *Executor) selectFrame(target string) error {
 	return nil
 }
 
-func (e *Executor) selectParentFrame() error {
+func (e *Executor) doSelectParentFrame() error {
 	if v := e.driver.SwitchParentFrame(); v == nil {
 		return fmt.Errorf("invalid frame")
 	}
 	return nil
 }
 
-func (e *Executor) selectWindowMain() error {
+func (e *Executor) doSelectWindowMain() error {
 	if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
 		return fmt.Errorf("invalid mainWindow")
 	}
 	return nil
 }
 
-func (e *Executor) selectWindowTitle(title string) error {
+func (e *Executor) doSelectWindowTitle(title string) error {
 	currentWindow, err := e.driver.CurrentWindowHandle()
 	if err != nil {
 		return err
@@ -658,7 +659,7 @@ func (e *Executor) selectWindowTitle(title string) error {
 	return nil
 }
 
-func (e *Executor) selectAlert(value int) error {
+func (e *Executor) doSelectAlert(value int) error {
 	_, err := e.driver.AlertText()
 	if err != nil {
 		return err
@@ -679,22 +680,32 @@ func (e *Executor) selectAlert(value int) error {
 	return nil
 }
 
-func (e *Executor) closeWindow() error {
-	currentWindow, err := e.driver.CurrentWindowHandle()
+func (e *Executor) doCloseWindow(target string) error {
+	if len(target) == 0 {
+		currentWindow, err := e.driver.CurrentWindowHandle()
+		if err != nil {
+			return err
+		}
+		if currentWindow == e.mainWindow {
+			return fmt.Errorf("can't close mainWindow")
+		}
+		_ = e.driver.Close()
+		if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
+			return fmt.Errorf("invalid mainWindow")
+		}
+		return nil
+	}
+	handle, err := e.windowHandles.GetHandle(target)
 	if err != nil {
 		return err
 	}
-	if currentWindow == e.mainWindow {
-		return fmt.Errorf("can't close mainWindow")
-	}
-	_ = e.driver.Close()
-	if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
-		return fmt.Errorf("invalid mainWindow")
+	if p := e.driver.CloseWindow(handle); p == nil {
+		return fmt.Errorf("invalid handle")
 	}
 	return nil
 }
 
-func (e *Executor) stackAdd(id string, target string, until string) {
+func (e *Executor) doStackAdd(id string, target string, until string) error {
 	v := 0
 	if len(until) > 0 {
 		v = 1
@@ -711,18 +722,21 @@ func (e *Executor) stackAdd(id string, target string, until string) {
 		}
 		e.stack[id] = values
 	}
+	return nil
 }
 
-func (e *Executor) stackPrint() {
+func (e *Executor) doStackPrint() error {
 	k, _ := json.MarshalIndent(e.stack, "", "	")
 	fmt.Println(string(k))
+	return nil
 }
 
-func (e *Executor) stackReset() {
+func (e *Executor) doStackReset() error {
 	e.stack = nil
+	return nil
 }
 
-func (e *Executor) assert(target string, until string, caption string) error {
+func (e *Executor) doAssert(target string, until string, caption string) error {
 	v := 0
 	if len(until) > 0 {
 		v = 1
@@ -741,7 +755,7 @@ func (e *Executor) assert(target string, until string, caption string) error {
 	return nil
 }
 
-func (e *Executor) exists(target string, until string) error {
+func (e *Executor) doExists(target string, until string) error {
 	v := 0
 	if len(until) > 0 {
 		v = 1
@@ -752,7 +766,7 @@ func (e *Executor) exists(target string, until string) error {
 	return nil
 }
 
-func (e *Executor) until(target string, until string) error {
+func (e *Executor) doUntil(target string, until string) error {
 	v := 0
 	if len(until) > 0 {
 		v = 1
@@ -763,7 +777,22 @@ func (e *Executor) until(target string, until string) error {
 	return nil
 }
 
-func (e *Executor) selectOption(target string, value string) error {
+func (e *Executor) doSelectWindow(target string) error {
+	handle, err := e.windowHandles.GetHandle(target)
+	if err != nil {
+		return err
+	}
+	if err := e.driver.SwitchWindow(handle); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *Executor) doStoreWindowHandle(target string) error {
+	return e.windowHandles.Store(target)
+}
+
+func (e *Executor) doSelect(target string, value string) error {
 	v := strings.Split(value, "=")
 	if len(v) < 2 {
 		return fmt.Errorf("invalid value")
@@ -789,18 +818,119 @@ func (e *Executor) selectOption(target string, value string) error {
 		if computedLabel == label {
 			return k.Click()
 		}
-
 	}
 	return fmt.Errorf("not found")
 }
 
-func (e *Executor) activeElement(id string) error {
+func (e *Executor) doActiveElement(id string) error {
 	v, err := e.driver.ActiveElement()
 	if err != nil {
 		return err
 	}
 	fmt.Printf("%s ActiveElement =>\n", id)
 	v.Print()
+	return nil
+}
+
+func (e *Executor) doWindowHandles(id string) error {
+	fmt.Printf("%s WindowHandles =>\n", id)
+	v, _ := e.driver.WindowHandles()
+	fmt.Println(v)
+	return nil
+}
+
+func (e *Executor) doPause(target string) error {
+	v, err := strconv.Atoi(target)
+	if err != nil {
+		return err
+	}
+	time.Sleep(time.Millisecond * time.Duration(v))
+	return nil
+}
+
+func (e *Executor) doSetTimeout(value string) error {
+	e.wait = parseInt(value)
+	return nil
+}
+
+func (e *Executor) doPageSource(id string) error {
+	v, _ := e.driver.PageSource()
+	fmt.Printf("%s PageSource =>\n", id)
+	fmt.Println(v)
+	return nil
+}
+
+func (e *Executor) doStatus(id string) error {
+	fmt.Printf("%s Status =>\n", id)
+	k, _ := e.driver.Status()
+	fmt.Println(k)
+	return nil
+}
+
+func (e *Executor) doGetCookie(target string, id string) error {
+	v, _ := e.driver.GetCookie(target)
+	fmt.Printf("%s Cookie =>\n", id)
+	fmt.Println(v)
+	return nil
+}
+
+func (e *Executor) doGetAllCookies(id string) error {
+	v, _ := e.driver.GetCookies()
+	fmt.Printf("%s Cookies =>\n", id)
+	fmt.Println(v)
+	return nil
+}
+
+func (e *Executor) doDeleteAllCookies() error {
+	return e.driver.DeleteAllCookies()
+}
+
+func (e *Executor) doDeleteCookie(target string) error {
+	return e.driver.DeleteCookie(target)
+}
+
+func (e *Executor) doActionsSendKeys(value string) error {
+	return e.driver.KeyDown(value)
+}
+
+func (e *Executor) doSetWindowMain() error {
+	var err error
+	e.mainWindow, err = e.driver.CurrentWindowHandle()
+	return err
+}
+
+func (e *Executor) doHumanWait(value string) error {
+	e.sleep(parseInt(value))
+	return nil
+}
+
+func (e *Executor) doEnableDebug() error {
+	e.debug = true
+	return nil
+}
+
+func (e *Executor) doDisableError() error {
+	e.errorDisabled = true
+	return nil
+}
+
+func (e *Executor) doEnableError() error {
+	e.errorDisabled = false
+	return nil
+}
+
+func (e *Executor) doDisableDebug() error {
+	e.debug = false
+	return nil
+}
+
+func (e *Executor) doExecId(target string) error {
+	e.execId = target
+	return nil
+}
+
+func (e *Executor) doProbeId(target string) error {
+	e.probeId = target
 	return nil
 }
 
@@ -812,100 +942,99 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 
 	switch command {
 	case "execId":
-		e.execId = target
+		err = e.doExecId(target)
 	case "probe":
-		e.probeId = target
+		err = e.doProbeId(target)
 	case "until":
-		err = e.until(target, until)
+		err = e.doUntil(target, until)
 	case "open":
 		//nothing to do
 	case "setWindowSize":
 		//nothing to do
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":
-		err = e.timerHandler(target, command, value)
+		err = e.doTimer(target, command, value)
 	case "assert":
-		err = e.assert(target, until, value)
+		err = e.doAssert(target, until, value)
 	case "exists":
-		err = e.exists(target, until)
+		err = e.doExists(target, until)
 	case "stackAdd":
-		e.stackAdd(id, target, until)
+		err = e.doStackAdd(id, target, until)
 	case "stackReset":
-		e.stackReset()
+		err = e.doStackReset()
 	case "stackPrint":
-		e.stackPrint()
+		err = e.doStackPrint()
 	case "disableError":
-		e.errorDisabled = true
+		err = e.doDisableError()
 	case "enableError":
-		e.errorDisabled = false
+		err = e.doEnableError()
 	case "disableDebug":
-		e.debug = false
+		err = e.doDisableDebug()
 	case "enableDebug":
-		e.debug = true
+		err = e.doEnableDebug()
 	case "click", "rightClick", "doubleClick", "mouseUpAt", "mouseDownAt", "mouseMultipleMoveAt", "mouseMoveAt", "mouseOver":
-		err = e.waitForMouse(target, command, value)
+		err = e.doMouse(target, command, value)
 	case "mouseOut":
 		//nothing to do
 	case "type":
-		err = e.waitForTyping(target, value)
+		err = e.doType(target, value)
 	case "runScript":
-		err = e.waitForScript(target, nil)
+		err = e.doRunScript(target, nil)
 	case "humanWait":
-		e.doSleep(parseInt(value))
+		err = e.doHumanWait(value)
 	case "select":
-		err = e.selectOption(target, value)
+		err = e.doSelect(target, value)
+	case "setWindowMain":
+		err = e.doSetWindowMain()
+	case "selectWindow":
+		err = e.doSelectWindow(target)
 	case "selectWindowMain":
-		err = e.selectWindowMain()
+		err = e.doSelectWindowMain()
 	case "selectWindowTitle":
-		err = e.selectWindowTitle(value)
+		err = e.doSelectWindowTitle(value)
 	case "selectFrame":
-		err = e.selectFrame(target)
+		err = e.doSelectFrame(target)
 	case "selectParentFrame":
-		err = e.selectParentFrame()
+		err = e.doSelectParentFrame()
 	case "selectAlert":
-		err = e.selectAlert(parseInt(value))
+		err = e.doSelectAlert(parseInt(value))
 	case "closeWindow":
-		err = e.closeWindow()
+		err = e.doCloseWindow("")
 	case "actionsSendKeys":
-		err = e.driver.KeyDown(value)
-		//e.actions.sendKeys(value).perform()
+		err = e.doActionsSendKeys(value)
 	case "setTimeout":
-		e.wait = parseInt(value)
+		err = e.doSetTimeout(value)
 	case "activeElement":
-		err = e.activeElement(id)
+		err = e.doActiveElement(id)
 	case "pageSource":
-		v, _ := e.driver.PageSource()
-		fmt.Printf("%s PageSource =>\n", id)
-		fmt.Println(v)
+		err = e.doPageSource(id)
 	case "getAllCookies":
-		v, _ := e.driver.GetCookies()
-		fmt.Printf("%s Cookies =>\n", id)
-		fmt.Println(v)
+		err = e.doGetAllCookies(id)
 	case "getCookie":
-		v, _ := e.driver.GetCookie(target)
-		fmt.Printf("%s Cookie =>\n", id)
-		fmt.Println(v)
+		err = e.doGetCookie(target, id)
 	case "deleteAllCookies":
-		err = e.driver.DeleteAllCookies()
+		err = e.doDeleteAllCookies()
 	case "deleteCookie":
-		err = e.driver.DeleteCookie(target)
+		err = e.doDeleteCookie(target)
 	case "windowHandles":
-		fmt.Printf("%s WindowHandles =>\n", id)
-		v, _ := e.driver.WindowHandles()
-		fmt.Println(v)
+		err = e.doWindowHandles(id)
+	case "storeWindowHandle":
+		err = e.doStoreWindowHandle(target)
+	case "close":
+		err = e.doCloseWindow(target)
 	case "status":
-		fmt.Printf("%s Status =>\n", id)
-		k, _ := e.driver.Status()
-		fmt.Println(k)
+		err = e.doStatus(id)
+	case "pause":
+		err = e.doPause(target)
+	case "noop":
+		//nothing to do
 	default:
 		e.log(LogLevelWarning, "unimplemented command: "+command)
 	}
-
-	var event = e.createEvent(e.execId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
+	event := e.createEvent(e.execId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
 	event.Label = id
 	event.Target = target
 	event.Command = command
 	e.logEvent(event)
-
 	return err
 }
 
@@ -993,6 +1122,9 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 					x = jump
 				}
 			} else {
+				if len(cmd.WindowHandleName) > 0 {
+					e.windowHandles.Add(e.driver, cmd)
+				}
 				err = e.exec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
 			}
 			if e.errorDisabled {

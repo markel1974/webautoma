@@ -6,6 +6,10 @@ type ConfigCommand struct {
 	Command string `json:"command"`
 	Until   string `json:"until"`
 	Value   string `json:"value"`
+
+	WindowHandleName string `json:"windowHandleName"`
+	WindowTimeout    int    `json:"windowTimeout"`
+	OpensWindow      bool   `json:"opensWindow"`
 }
 
 type ConfigTest struct {
