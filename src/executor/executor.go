@@ -659,7 +659,8 @@ func (e *Executor) doSelectWindowTitle(title string) error {
 	return nil
 }
 
-func (e *Executor) doSelectAlert(value int) error {
+func (e *Executor) doSelectAlert(val string) error {
+	value := parseInt(val)
 	_, err := e.driver.AlertText()
 	if err != nil {
 		return err
@@ -680,21 +681,22 @@ func (e *Executor) doSelectAlert(value int) error {
 	return nil
 }
 
-func (e *Executor) doCloseWindow(target string) error {
-	if len(target) == 0 {
-		currentWindow, err := e.driver.CurrentWindowHandle()
-		if err != nil {
-			return err
-		}
-		if currentWindow == e.mainWindow {
-			return fmt.Errorf("can't close mainWindow")
-		}
-		_ = e.driver.Close()
-		if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
-			return fmt.Errorf("invalid mainWindow")
-		}
-		return nil
+func (e *Executor) doCloseWindow() error {
+	currentWindow, err := e.driver.CurrentWindowHandle()
+	if err != nil {
+		return err
 	}
+	if currentWindow == e.mainWindow {
+		return fmt.Errorf("can't close mainWindow")
+	}
+	_ = e.driver.Close()
+	if v := e.driver.SwitchWindow(e.mainWindow); v == nil {
+		return fmt.Errorf("invalid mainWindow")
+	}
+	return nil
+}
+
+func (e *Executor) doClose(target string) error {
 	handle, err := e.windowHandles.GetHandle(target)
 	if err != nil {
 		return err
@@ -996,9 +998,9 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "selectParentFrame":
 		err = e.doSelectParentFrame()
 	case "selectAlert":
-		err = e.doSelectAlert(parseInt(value))
+		err = e.doSelectAlert(value)
 	case "closeWindow":
-		err = e.doCloseWindow("")
+		err = e.doCloseWindow()
 	case "actionsSendKeys":
 		err = e.doActionsSendKeys(value)
 	case "setTimeout":
@@ -1020,7 +1022,7 @@ func (e *Executor) exec(id string, command string, target string, until string, 
 	case "storeWindowHandle":
 		err = e.doStoreWindowHandle(target)
 	case "close":
-		err = e.doCloseWindow(target)
+		err = e.doClose(target)
 	case "status":
 		err = e.doStatus(id)
 	case "pause":
@@ -1138,26 +1140,4 @@ func (e *Executor) Start(driver base.IWebDriver) error {
 	}
 	e.finalize(nil)
 	return nil
-}
-
-func parseInt(in string) int {
-	out, _ := strconv.Atoi(in)
-	return out
-}
-
-func computeFileId(filename string) string {
-	var pos = strings.LastIndex(filename, "\\")
-	if pos < 0 {
-		pos = strings.LastIndex(filename, "/")
-	}
-	if pos < 0 {
-		pos = 0
-	} else {
-		pos++
-	}
-	name := filename[pos:]
-	if pos := strings.LastIndex(name, "."); pos >= 0 {
-		name = name[0:pos]
-	}
-	return name
 }
