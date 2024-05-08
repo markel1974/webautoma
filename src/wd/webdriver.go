@@ -639,6 +639,7 @@ func (wd *WebDriver) SendModifier(modifier string, isDown bool) error {
 
 func (wd *WebDriver) KeyDown(keys string) error {
 	// Selenium implemented the actions API but has not yet updated its new session response.
+
 	if !wd.w3cCompatible && !(wd.browser == "firefox" && wd.browserVersion.Major > 47) {
 		return wd.voidCommand("/session/%s/keys", wd.processKeyString(keys))
 	}

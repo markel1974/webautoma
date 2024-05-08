@@ -164,79 +164,79 @@ func (e *Adapter) Navigate(url string) error {
 }
 
 func (e *Adapter) SwitchParentFrame() error {
-	return e.tester(func() error { return e.driver.SwitchParentFrame() })
+	return e.tester(e.wait, func() error { return e.driver.SwitchParentFrame() })
 }
 
 func (e *Adapter) SelectWindowMain() error {
-	return e.tester(func() error { return e.driver.SwitchWindow(e.rootWindow) })
+	return e.tester(e.wait, func() error { return e.driver.SwitchWindow(e.rootWindow) })
 }
 
 func (e *Adapter) CurrentWindowHandle() (string, error) {
-	return e.testerString(func() (string, error) { return e.driver.CurrentWindowHandle() })
+	return e.testerString(e.wait, func() (string, error) { return e.driver.CurrentWindowHandle() })
 }
 
 func (e *Adapter) WindowHandles() ([]string, error) {
-	return e.testerStringArray(func() ([]string, error) { return e.driver.WindowHandles() })
+	return e.testerStringArray(e.wait, func() ([]string, error) { return e.driver.WindowHandles() })
 }
 
 func (e *Adapter) SwitchWindow(window string) error {
-	return e.tester(func() error { return e.driver.SwitchWindow(window) })
+	return e.tester(e.wait, func() error { return e.driver.SwitchWindow(window) })
 }
 
 func (e *Adapter) SwitchFrame(frame interface{}) error {
-	return e.tester(func() error { return e.driver.SwitchFrame(frame) })
+	return e.tester(e.wait, func() error { return e.driver.SwitchFrame(frame) })
 }
 
 func (e *Adapter) Title() (string, error) {
-	return e.testerString(func() (string, error) { return e.driver.Title() })
+	return e.testerString(e.wait, func() (string, error) { return e.driver.Title() })
 }
 
 func (e *Adapter) ExecuteScript(script string, args []interface{}) error {
-	return e.tester(func() error { _, err := e.driver.ExecuteScript(script, args); return err })
+	return e.tester(e.wait, func() error { _, err := e.driver.ExecuteScript(script, args); return err })
 }
 
 func (e *Adapter) ActiveElement() (base.IWebElement, error) {
-	return e.testerElement(func() (base.IWebElement, error) { return e.driver.ActiveElement() })
+	return e.testerElement(e.wait, func() (base.IWebElement, error) { return e.driver.ActiveElement() })
 }
 
 func (e *Adapter) Click(buttonId int) error {
-	return e.tester(func() error { return e.driver.Click(buttonId) })
+	return e.tester(e.wait, func() error { return e.driver.Click(buttonId) })
 }
 
 func (e *Adapter) DoubleClick() error {
-	return e.tester(func() error { return e.driver.DoubleClick() })
+	return e.tester(e.wait, func() error { return e.driver.DoubleClick() })
 }
 
 func (e *Adapter) ButtonUp() error {
-	return e.tester(func() error { return e.driver.ButtonUp() })
+	return e.tester(e.wait, func() error { return e.driver.ButtonUp() })
 }
 
 func (e *Adapter) ButtonDown() error {
-	return e.tester(func() error { return e.driver.ButtonDown() })
+	return e.tester(e.wait, func() error { return e.driver.ButtonDown() })
 }
 
 func (e *Adapter) AlertText() (string, error) {
-	return e.testerString(func() (string, error) { return e.driver.AlertText() })
+	return e.testerString(e.wait, func() (string, error) { return e.driver.AlertText() })
 }
 
 func (e *Adapter) AcceptAlert() error {
-	return e.tester(func() error { return e.driver.AcceptAlert() })
+	return e.tester(e.wait, func() error { return e.driver.AcceptAlert() })
 }
 
 func (e *Adapter) DismissAlert() error {
-	return e.tester(func() error { return e.driver.DismissAlert() })
+	return e.tester(e.wait, func() error { return e.driver.DismissAlert() })
 }
 
 func (e *Adapter) CloseWindow(handle string) error {
-	return e.tester(func() error { return e.driver.CloseWindow(handle) })
+	return e.tester(e.wait, func() error { return e.driver.CloseWindow(handle) })
 }
 
 func (e *Adapter) PageSource() (string, error) {
-	return e.testerString(func() (string, error) { return e.driver.PageSource() })
+	return e.testerString(e.wait, func() (string, error) { return e.driver.PageSource() })
 }
 
 func (e *Adapter) Status() (string, error) {
-	return e.testerString(func() (string, error) {
+	return e.testerString(e.wait, func() (string, error) {
 		status, err := e.driver.Status()
 		if err != nil {
 			return "", err
@@ -247,7 +247,7 @@ func (e *Adapter) Status() (string, error) {
 }
 
 func (e *Adapter) GetCookie(id string) (string, error) {
-	return e.testerString(func() (string, error) {
+	return e.testerString(e.wait, func() (string, error) {
 		cookie, err := e.driver.GetCookie(id)
 		if err != nil {
 			return "", err
@@ -258,7 +258,7 @@ func (e *Adapter) GetCookie(id string) (string, error) {
 }
 
 func (e *Adapter) GetCookies() (string, error) {
-	return e.testerString(func() (string, error) {
+	return e.testerString(e.wait, func() (string, error) {
 		cookies, err := e.driver.GetCookies()
 		if err != nil {
 			return "", err
@@ -269,35 +269,39 @@ func (e *Adapter) GetCookies() (string, error) {
 }
 
 func (e *Adapter) DeleteCookie(id string) error {
-	return e.tester(func() error { return e.driver.DeleteCookie(id) })
+	return e.tester(e.wait, func() error { return e.driver.DeleteCookie(id) })
 }
 
 func (e *Adapter) DeleteAllCookies() error {
-	return e.tester(func() error { return e.driver.DeleteAllCookies() })
+	return e.tester(e.wait, func() error { return e.driver.DeleteAllCookies() })
 }
 
 func (e *Adapter) KeyDown(keys string) error {
-	return e.tester(func() error { return e.driver.KeyDown(keys) })
+	return e.tester(e.wait, func() error { return e.driver.KeyDown(keys) })
 }
 
 func (e *Adapter) Close() error {
 	return e.driver.Close()
 }
 
+func (e *Adapter) ResizeWindow(handle string, w int, h int) error {
+	return e.tester(e.wait, func() error { return e.driver.ResizeWindow(handle, w, h) })
+}
+
 func (e *Adapter) ElementSendKeys(elm base.IWebElement, keys string) error {
-	return e.tester(func() error { return elm.SendKeys(keys) })
+	return e.tester(e.wait, func() error { return elm.SendKeys(keys) })
 }
 
 func (e *Adapter) ElementClick(elm base.IWebElement) error {
-	return e.tester(func() error { return elm.Click() })
+	return e.tester(e.wait, func() error { return elm.Click() })
 }
 
 func (e *Adapter) ElementMoveTo(elm base.IWebElement, xOffset float64, yOffset float64) error {
-	return e.tester(func() error { return elm.MoveTo(xOffset, yOffset) })
+	return e.tester(e.wait, func() error { return elm.MoveTo(xOffset, yOffset) })
 }
 
 func (e *Adapter) FindElement(by string, data string) (base.IWebElement, error) {
-	return e.testerElement(func() (base.IWebElement, error) { return e.driver.FindElement(by, data) })
+	return e.testerElement(e.wait, func() (base.IWebElement, error) { return e.driver.FindElement(by, data) })
 }
 
 func (e *Adapter) FindElementReady(by string, data string, until int) base.IWebElement {
@@ -305,7 +309,7 @@ func (e *Adapter) FindElementReady(by string, data string, until int) base.IWebE
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		found := false
-		elem, _ = e.FindElement(by, data)
+		elem, _ = e.driver.FindElement(by, data)
 		if until == 0 {
 			found = elem != nil
 		} else if until == 1 {
@@ -339,7 +343,7 @@ func (e *Adapter) SendKeys(elm base.IWebElement, by string, data string) error {
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
-		if err = e.ElementSendKeys(elm, string(data[pos])); err != nil {
+		if err = elm.SendKeys(string(data[pos])); err != nil {
 			if elm = e.FindElementReady(by, data, 2); elm == nil {
 				e.log(LogLevelDebug, fmt.Sprintf("(%s=%s) waitForType: element isn't ready", by, data))
 				return errors.New("element isn't ready")
@@ -361,33 +365,42 @@ func (e *Adapter) SendKeys(elm base.IWebElement, by string, data string) error {
 func (e *Adapter) MouseActions(elm base.IWebElement, command string, value string) error {
 	var err error
 	var start = UnixMilli(time.Now())
+	//key := "\t" //base.DownArrowKey // "\t" //base.SpaceKey
+	//fmt.Println("keyDOWN", key)
+	//for x := 0; x < 12; x++ {
+	//	if kkk := e.driver.KeyDown(key); kkk != nil {
+	//		fmt.Println(key, kkk)
+	//	}
+	//}
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
 		switch command {
 		case "click":
-			err = e.ElementClick(elm)
+			if err = elm.MoveTo(0, 0); err == nil {
+				err = elm.Click()
+			}
 		case "doubleClick":
-			if err = e.ElementMoveTo(elm, 0, 0); err == nil {
-				err = e.DoubleClick()
+			if err = elm.MoveTo(0, 0); err == nil {
+				err = e.driver.DoubleClick() //e.DoubleClick()
 			}
 		case "rightClick":
-			if err = e.ElementMoveTo(elm, 0, 0); err == nil {
-				err = e.Click(2)
+			if err = elm.MoveTo(0, 0); err == nil {
+				err = e.driver.Click(2) //e.Click(2)
 			}
 		case "mouseOver":
-			err = e.ElementMoveTo(elm, 0, 0)
+			err = elm.MoveTo(0, 0)
 		case "mouseUpAt":
 			if e.drag != nil {
 				var coordsUpAt = e.getCoords(value)
-				if err = e.ElementMoveTo(e.drag, coordsUpAt.X, coordsUpAt.Y); err != nil {
-					err = e.ButtonUp()
+				if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err != nil {
+					err = e.driver.ButtonUp() //e.ButtonUp()
 				}
 				e.drag = nil
 			}
 		case "mouseDownAt":
 			var coordsDownAt = e.getCoords(value)
-			if err = e.ElementMoveTo(elm, coordsDownAt.X, coordsDownAt.Y); err != nil {
-				err = e.ButtonDown()
+			if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err != nil {
+				err = e.driver.ButtonDown() //err = e.ButtonDown()
 				e.drag = elm
 			}
 		case "mouseMultipleMoveAt":
@@ -570,10 +583,10 @@ func (e *Adapter) getCoords(data string) base.Point {
 	return coords
 }
 
-func (e *Adapter) tester(fn func() error) error {
+func (e *Adapter) tester(wait int, fn func() error) error {
 	var err error
 	start := UnixMilli(time.Now())
-	for UnixMilli(time.Now())-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(wait) {
 		if err = fn(); err == nil {
 			return nil
 		}
@@ -582,11 +595,11 @@ func (e *Adapter) tester(fn func() error) error {
 	return err
 }
 
-func (e *Adapter) testerString(fn func() (string, error)) (string, error) {
+func (e *Adapter) testerString(wait int, fn func() (string, error)) (string, error) {
 	var val string
 	var err error
 	start := UnixMilli(time.Now())
-	for UnixMilli(time.Now())-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(wait) {
 		if val, err = fn(); err == nil {
 			return val, nil
 		}
@@ -595,11 +608,11 @@ func (e *Adapter) testerString(fn func() (string, error)) (string, error) {
 	return "", err
 }
 
-func (e *Adapter) testerStringArray(fn func() ([]string, error)) ([]string, error) {
+func (e *Adapter) testerStringArray(wait int, fn func() ([]string, error)) ([]string, error) {
 	var val []string
 	var err error
 	start := UnixMilli(time.Now())
-	for UnixMilli(time.Now())-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(wait) {
 		if val, err = fn(); err == nil {
 			return val, nil
 		}
@@ -608,11 +621,11 @@ func (e *Adapter) testerStringArray(fn func() ([]string, error)) ([]string, erro
 	return nil, err
 }
 
-func (e *Adapter) testerElement(fn func() (base.IWebElement, error)) (base.IWebElement, error) {
+func (e *Adapter) testerElement(wait int, fn func() (base.IWebElement, error)) (base.IWebElement, error) {
 	var val base.IWebElement
 	var err error
 	start := UnixMilli(time.Now())
-	for UnixMilli(time.Now())-start < int64(e.wait) {
+	for UnixMilli(time.Now())-start < int64(wait) {
 		if val, err = fn(); err == nil {
 			return val, nil
 		}

@@ -26,6 +26,7 @@ type Executor struct {
 	stack     map[string]interface{}
 	adapter   *Adapter
 	execId    string
+	lastFrame interface{}
 }
 
 func New(driver base.IWebDriver) *Executor {
@@ -37,6 +38,7 @@ func New(driver base.IWebDriver) *Executor {
 		stack:     nil,
 		adapter:   NewAdapter(driver),
 		execId:    "",
+		lastFrame: nil,
 	}
 	return e
 }
@@ -208,18 +210,23 @@ func (e *Executor) doSelectFrame(target string) error {
 			if frame, err = strconv.Atoi(v[1]); err != nil {
 				return err
 			}
+			e.lastFrame = frame
 		case "relative":
 			frame = v[1]
+			e.lastFrame = frame
 		default:
 			frame = v[1]
+			e.lastFrame = frame
 		}
 	} else {
 		frame = ""
+		e.lastFrame = nil
 	}
 	return e.adapter.SwitchFrame(frame)
 }
 
 func (e *Executor) doSelectParentFrame() error {
+	e.lastFrame = nil
 	return e.adapter.SwitchParentFrame()
 }
 
@@ -559,6 +566,16 @@ func (e *Executor) doProbeId(target string) error {
 	return nil
 }
 
+func (e *Executor) doSetWindowSize(target string) error {
+	v := strings.Split(target, "x")
+	if len(v) < 2 {
+		return fmt.Errorf("invalid target")
+	}
+	width, _ := strconv.Atoi(v[0])
+	height, _ := strconv.Atoi(v[1])
+	return e.adapter.ResizeWindow("", width, height)
+}
+
 func (e *Executor) commandExec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -575,6 +592,7 @@ func (e *Executor) commandExec(id string, command string, target string, until s
 	case "open":
 		//nothing to do
 	case "setWindowSize":
+		err = e.doSetWindowSize(target)
 		//nothing to do
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":
 		err = e.doTimer(target, command, value)
@@ -714,6 +732,19 @@ func (e *Executor) commandsLoop() (string, error) {
 			} else {
 				if len(cmd.WindowHandleName) > 0 {
 					e.adapter.AddWindowHandle(cmd)
+				}
+				if e.lastFrame != nil {
+					/*
+						//if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
+						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchParentFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+						//}
+						if frameErr := e.adapter.SwitchFrame(""); frameErr != nil {
+							e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+						}
+						if frameErr := e.adapter.SwitchFrame(e.lastFrame); frameErr != nil {
+							e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+						}
+					*/
 				}
 				err = e.commandExec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
 			}
