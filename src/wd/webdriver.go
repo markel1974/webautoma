@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"github.com/markel1974/webautoma/src/wd/base"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -527,7 +526,7 @@ func (wd *WebDriver) SwitchWindow(handle string) error {
 
 // SwitchParentFrame changes focus to parent frame on the page.
 func (wd *WebDriver) SwitchParentFrame() error {
-	return wd.voidCommand("/session/%s/frame/parent", wd.SessionID())
+	return wd.voidCommand("/session/%s/frame/parent", nil) //wd.id)
 }
 
 func (wd *WebDriver) ActiveElement() (base.IWebElement, error) {
@@ -743,7 +742,7 @@ func (wd *WebDriver) Screenshot() ([]byte, error) {
 	}
 	buf := []byte(data)
 	decoder := base64.NewDecoder(base64.StdEncoding, bytes.NewBuffer(buf))
-	return ioutil.ReadAll(decoder)
+	return io.ReadAll(decoder)
 }
 
 func (wd *WebDriver) WaitWithTimeoutAndInterval(condition base.Condition, timeout, interval time.Duration) error {
