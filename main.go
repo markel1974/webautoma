@@ -40,29 +40,8 @@ func createVariables(variables string) (map[string]interface{}, error) {
 }
 
 func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, imgDump bool, capture string, variables string) error {
-	variablesData, err := createVariables(variables)
-	if err != nil {
-		return err
-	}
-	captureData := createCapture(capture)
-	exec := executor.New()
-
-	if len(resultFile) > 0 {
-		exec.SetLogFile(resultFile)
-	}
-	if len(imgFile) > 0 {
-		exec.SetImageFile(imgFile)
-	}
-	if imgDump {
-		exec.SetImageDump()
-	}
-	if err := exec.Setup(sideFile, captureData, variablesData); err != nil {
-		return err
-	}
-	logType, logLevel := exec.RequiredLogs()
+	logType, logLevel := executor.RequiredLogs()
 	chromeCaps := chrome.Caps{}
-
-	//TEST
 	for _, arg := range args {
 		chromeCaps.Args = append(chromeCaps.Args, arg /*"headless"*/)
 	}
@@ -73,9 +52,19 @@ func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, i
 	if err := driver.Start(); err != nil {
 		return err
 	}
-	if err := exec.Start(driver); err != nil {
+	variablesData, err := createVariables(variables)
+	if err != nil {
 		return err
 	}
+	captureData := createCapture(capture)
+	exec := executor.New(driver)
+	if err = exec.Setup(sideFile, resultFile, imgFile, imgDump, captureData, variablesData); err != nil {
+		return err
+	}
+	if err = exec.Start(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
