@@ -86,6 +86,8 @@ func main() {
 	var driverArgs string
 	var imgDump bool
 
+	wd.Example3()
+
 	flag.BoolVar(&showHelp, "h", false, "show this help")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 	flag.StringVar(&driverArgs, "d", "", "webdriver args (semicolon separated)")

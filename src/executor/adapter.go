@@ -365,13 +365,6 @@ func (e *Adapter) SendKeys(elm base.IWebElement, by string, data string) error {
 func (e *Adapter) MouseActions(elm base.IWebElement, command string, value string) error {
 	var err error
 	var start = UnixMilli(time.Now())
-	//key := "\t" //base.DownArrowKey // "\t" //base.SpaceKey
-	//fmt.Println("keyDOWN", key)
-	//for x := 0; x < 12; x++ {
-	//	if kkk := e.driver.KeyDown(key); kkk != nil {
-	//		fmt.Println(key, kkk)
-	//	}
-	//}
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
 		switch command {

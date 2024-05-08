@@ -1,7 +1,5 @@
 package base
 
-import "time"
-
 // KeyAction represents an activity involving a keyboard key.
 type KeyAction map[string]interface{}
 
@@ -65,10 +63,10 @@ const (
 )
 
 // KeyPauseAction builds a KeyAction which pauses for the supplied duration.
-func KeyPauseAction(duration time.Duration) KeyAction {
+func KeyPauseAction(ms uint) KeyAction {
 	return KeyAction{
 		"type":     "pause",
-		"duration": uint(duration / time.Millisecond),
+		"duration": ms,
 	}
 }
 

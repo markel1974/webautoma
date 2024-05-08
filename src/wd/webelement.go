@@ -26,14 +26,21 @@ func (elem *WebElement) SendKeys(keys string) error {
 
 func (wd *WebDriver) processKeyString(keys string) interface{} {
 	if !wd.w3cCompatible {
+
 		//chars := make([]string, len(keys))
 		//for i, c := range keys {
 		//	chars[i] = string(c)
 		//}
-		var chars []string
-		for _, c := range keys {
-			chars = append(chars, string(c))
+
+		b := []rune(keys)
+		chars := make([]string, len(b))
+		for i, c := range keys {
+			chars[i] = string(c)
 		}
+		//var chars []string
+		//for _, c := range keys {
+		//	chars = append(chars, string(c))
+		//}
 		return map[string][]string{"value": chars}
 	}
 	return map[string]string{"text": keys}

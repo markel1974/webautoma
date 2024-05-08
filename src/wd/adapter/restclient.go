@@ -1,4 +1,4 @@
-package wd
+package adapter
 
 import (
 	"bytes"

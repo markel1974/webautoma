@@ -1,6 +1,7 @@
 // See https://www.w3.org/TR/webdriver for the protocol.
 
 // https://github.com/hupe1980/gowebdriver
+// https://github.com/tebeka/selenium
 
 package wd
 
@@ -676,6 +677,18 @@ func (wd *WebDriver) StorePointerActions(inputID string, pointer base.PointerTyp
 		"id":         inputID,
 		"parameters": map[string]string{"pointerType": string(pointer)},
 		"actions":    rawActions,
+	})
+}
+
+func (wd *WebDriver) StoreWheelActions(inputID string, actions ...base.WheelAction) {
+	var rawActions []map[string]interface{}
+	for _, action := range actions {
+		rawActions = append(rawActions, action)
+	}
+	wd.storedActions = append(wd.storedActions, map[string]interface{}{
+		"type":    "wheel",
+		"id":      inputID,
+		"actions": rawActions,
 	})
 }
 
