@@ -116,8 +116,8 @@ func (e *Executor) computeSelector(target string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid target")
 	}
 	var by string
-	var data = strings.TrimSpace(container[1])
-	var command = strings.TrimSpace(container[0])
+	data := strings.TrimSpace(container[1])
+	command := strings.TrimSpace(container[0])
 	switch command {
 	case "xpath":
 		by = base.ByXPATH // selector.xpath(data)
