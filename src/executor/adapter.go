@@ -398,9 +398,14 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 			}
 		case "mouseMultipleMoveAt":
 			if e.drag != nil {
+				baseCords := base.Point{X: 0, Y: 0}
 				for _, m := range strings.Split(value, "|") {
 					var coordsMultipleMoveAt = e.getCoords(m)
-					if err = e.drag.MoveTo(coordsMultipleMoveAt.X, coordsMultipleMoveAt.Y); err != nil {
+					x := baseCords.X + coordsMultipleMoveAt.X
+					y := baseCords.Y + coordsMultipleMoveAt.Y
+					baseCords.X = x
+					baseCords.Y = y
+					if err = e.drag.MoveTo(x, y); err != nil {
 						break
 					}
 					e.HumanWait()

@@ -27,6 +27,7 @@ type Executor struct {
 	adapter   *Adapter
 	execId    string
 	lastFrame interface{}
+	baseUrl   string
 }
 
 func New(driver base.IWebDriver) *Executor {
@@ -39,6 +40,7 @@ func New(driver base.IWebDriver) *Executor {
 		adapter:   NewAdapter(driver),
 		execId:    "",
 		lastFrame: nil,
+		baseUrl:   "",
 	}
 	return e
 }
@@ -92,6 +94,7 @@ func (e *Executor) loadUrl(url string) error {
 	if err := e.adapter.Navigate(url); err != nil {
 		return err
 	}
+	e.baseUrl = url
 	return nil
 }
 
@@ -613,6 +616,13 @@ func (e *Executor) doScrollTo(target string, value string) error {
 	return elm.ScrollTo(x, y)
 }
 
+func (e *Executor) doNavigate(target string) error {
+	if strings.HasPrefix(target, "/") {
+		target = e.baseUrl + target
+	}
+	return e.adapter.Navigate(target)
+}
+
 func (e *Executor) commandExec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -627,10 +637,9 @@ func (e *Executor) commandExec(id string, command string, target string, until s
 	case "until":
 		err = e.doUntil(target, until)
 	case "open":
-		//nothing to do
+		err = e.doNavigate(target)
 	case "setWindowSize":
 		err = e.doSetWindowSize(target)
-		//nothing to do
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":
 		err = e.doTimer(target, command, value)
 	case "assert":
