@@ -10,16 +10,19 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"time"
 )
 
 func newDefaultClient() *http.Client {
 	return &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			//IMPORTANT chromedriver support only 6 connections
-			MaxConnsPerHost:     4,
-			MaxIdleConnsPerHost: 2,
-			MaxIdleConns:        2,
+			MaxConnsPerHost:       4,
+			MaxIdleConnsPerHost:   2,
+			MaxIdleConns:          2,
+			ResponseHeaderTimeout: 30 * time.Second,
 			//MaxIdleConns:          10,
 			//IdleConnTimeout:       3600 * time.Second,
 			//TLSHandshakeTimeout:   3600 * time.Second,

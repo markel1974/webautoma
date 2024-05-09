@@ -374,11 +374,11 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 			//}
 		case "doubleClick":
 			if err = elm.MoveTo(0, 0); err == nil {
-				err = e.driver.DoubleClick() //e.DoubleClick()
+				err = e.driver.DoubleClick()
 			}
 		case "rightClick":
 			if err = elm.MoveTo(0, 0); err == nil {
-				err = e.driver.Click(2) //e.Click(2)
+				err = e.driver.Click(2)
 			}
 		case "mouseOver":
 			err = elm.MoveTo(0, 0)
@@ -386,21 +386,21 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 			if e.drag != nil {
 				var coordsUpAt = e.getCoords(value)
 				if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err != nil {
-					err = e.driver.ButtonUp() //e.ButtonUp()
+					err = e.driver.ButtonUp()
 				}
 				e.drag = nil
 			}
 		case "mouseDownAt":
 			var coordsDownAt = e.getCoords(value)
 			if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err != nil {
-				err = e.driver.ButtonDown() //err = e.ButtonDown()
+				err = e.driver.ButtonDown()
 				e.drag = elm
 			}
 		case "mouseMultipleMoveAt":
 			if e.drag != nil {
 				for _, m := range strings.Split(value, "|") {
 					var coordsMultipleMoveAt = e.getCoords(m)
-					if err = e.ElementMoveTo(e.drag, coordsMultipleMoveAt.X, coordsMultipleMoveAt.Y); err != nil {
+					if err = e.drag.MoveTo(coordsMultipleMoveAt.X, coordsMultipleMoveAt.Y); err != nil {
 						break
 					}
 					e.HumanWait()
@@ -409,7 +409,7 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 		case "mouseMoveAt":
 			if e.drag != nil {
 				var coordsMoveAt = e.getCoords(value)
-				err = e.ElementMoveTo(e.drag, coordsMoveAt.X, coordsMoveAt.Y)
+				err = e.drag.MoveTo(coordsMoveAt.X, coordsMoveAt.Y)
 			}
 		}
 		if err == nil {
