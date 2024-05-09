@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/markel1974/webautoma/src/wd/base"
 	"strings"
+	"time"
 )
 
 type Window struct {
@@ -17,7 +18,7 @@ type Window struct {
 }
 
 func NewWindow(wd base.IWebDriver, command ConfigCommand) *Window {
-	return &Window{
+	w := &Window{
 		wd:      wd,
 		varName: "${" + command.WindowHandleName + "}",
 		name:    command.WindowHandleName,
@@ -25,6 +26,10 @@ func NewWindow(wd base.IWebDriver, command ConfigCommand) *Window {
 		open:    command.OpensWindow,
 		timeout: command.WindowTimeout,
 	}
+	if w.timeout > 0 {
+		time.Sleep(time.Millisecond * time.Duration(w.timeout))
+	}
+	return w
 }
 
 func (w *Window) Store() error {
@@ -59,8 +64,10 @@ func NewWindows() *Windows {
 	}
 }
 
-func (w *Windows) Add(wd base.IWebDriver, command ConfigCommand) {
-	w.last = NewWindow(wd, command)
+func (w *Windows) Add(wd base.IWebDriver, command ConfigCommand) int {
+	win := NewWindow(wd, command)
+	w.last = win
+	return win.timeout
 }
 
 func (w *Windows) Store(target string) error {

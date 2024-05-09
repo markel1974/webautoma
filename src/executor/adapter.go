@@ -99,8 +99,8 @@ func (e *Adapter) StoreWindowHandle(id string) error {
 	return e.windowHandles.Store(id)
 }
 
-func (e *Adapter) AddWindowHandle(cmd ConfigCommand) {
-	e.windowHandles.Add(e.driver, cmd)
+func (e *Adapter) AddWindowHandle(cmd ConfigCommand) int {
+	return e.windowHandles.Add(e.driver, cmd)
 }
 
 func (e *Adapter) Quit() error {
@@ -385,14 +385,16 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 		case "mouseUpAt":
 			if e.drag != nil {
 				var coordsUpAt = e.getCoords(value)
-				if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err != nil {
+				if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err == nil {
+					fmt.Println("mouseUpAt", coordsUpAt.X, coordsUpAt.Y)
 					err = e.driver.ButtonUp()
 				}
 				e.drag = nil
 			}
 		case "mouseDownAt":
 			var coordsDownAt = e.getCoords(value)
-			if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err != nil {
+			if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err == nil {
+				fmt.Println("mouseDownAt", coordsDownAt.X, coordsDownAt.Y)
 				err = e.driver.ButtonDown()
 				e.drag = elm
 			}
@@ -409,6 +411,7 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 		case "mouseMoveAt":
 			if e.drag != nil {
 				var coordsMoveAt = e.getCoords(value)
+				fmt.Println("mouseMoveAt", coordsMoveAt.X, coordsMoveAt.Y)
 				err = e.drag.MoveTo(coordsMoveAt.X, coordsMoveAt.Y)
 			}
 		}

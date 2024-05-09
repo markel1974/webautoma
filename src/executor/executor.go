@@ -769,8 +769,9 @@ func (e *Executor) commandsLoop() (string, error) {
 					x = jump
 				}
 			} else {
-				if len(cmd.WindowHandleName) > 0 {
-					e.adapter.AddWindowHandle(cmd)
+				windowTimeout := 0
+				if err == nil && len(cmd.WindowHandleName) > 0 {
+					windowTimeout = e.adapter.AddWindowHandle(cmd)
 				}
 				if e.lastFrame != nil {
 					/*
@@ -786,6 +787,9 @@ func (e *Executor) commandsLoop() (string, error) {
 					*/
 				}
 				err = e.commandExec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
+				if windowTimeout > 0 {
+					e.adapter.Sleep(windowTimeout)
+				}
 			}
 			if e.adapter.IsErrorDisabled() {
 				err = nil
