@@ -6,68 +6,71 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/markel1974/webautoma/src/wd/base"
-	"io/ioutil"
+	"io"
 )
 
 type WebElement struct {
-	parent *WebDriver
+	wd     *WebDriver
+	client *Client
 	id     string
 }
 
+func NewWebElement(wd *WebDriver, client *Client, id string) *WebElement {
+	return &WebElement{
+		wd:     wd,
+		client: client,
+		id:     id,
+	}
+}
+
 func (elem *WebElement) Click() error {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/click", elem.id)
-	return elem.parent.voidCommand(urlTemplate, nil)
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/click", elem.id)
+	return elem.client.VoidCommand(rUrl, nil)
 }
 
 func (elem *WebElement) SendKeys(keys string) error {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/value", elem.id)
-	return elem.parent.voidCommand(urlTemplate, elem.parent.processKeyString(keys))
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/value", elem.id)
+	return elem.client.VoidCommand(rUrl, elem.wd.processKeyString(keys))
 }
 
 func (wd *WebDriver) processKeyString(keys string) interface{} {
 	if !wd.w3cCompatible {
-
 		//chars := make([]string, len(keys))
 		//for i, c := range keys {
 		//	chars[i] = string(c)
 		//}
-
 		b := []rune(keys)
 		chars := make([]string, len(b))
 		for i, c := range keys {
 			chars[i] = string(c)
 		}
-		//var chars []string
-		//for _, c := range keys {
-		//	chars = append(chars, string(c))
-		//}
 		return map[string][]string{"value": chars}
 	}
 	return map[string]string{"text": keys}
 }
 
 func (elem *WebElement) TagName() (string, error) {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/name", elem.id)
-	return elem.parent.stringCommand(urlTemplate)
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/name", elem.id)
+	return elem.client.StringCommand(rUrl)
 }
 
 func (elem *WebElement) Text() (string, error) {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/text", elem.id)
-	return elem.parent.stringCommand(urlTemplate)
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/text", elem.id)
+	return elem.client.StringCommand(rUrl)
 }
 
 func (elem *WebElement) Submit() error {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/submit", elem.id)
-	return elem.parent.voidCommand(urlTemplate, nil)
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/submit", elem.id)
+	return elem.client.VoidCommand(rUrl, nil)
 }
 
 func (elem *WebElement) Clear() error {
-	urlTemplate := fmt.Sprintf("/session/%%s/element/%s/clear", elem.id)
-	return elem.parent.voidCommand(urlTemplate, nil)
+	rUrl := fmt.Sprintf("/session/%%s/element/%s/clear", elem.id)
+	return elem.client.VoidCommand(rUrl, nil)
 }
 
 func (elem *WebElement) MoveTo(xOffset float64, yOffset float64) error {
-	return elem.parent.voidCommand("/session/%s/moveto", map[string]interface{}{
+	return elem.client.VoidCommand("/session/%s/moveto", map[string]interface{}{
 		"element": elem.id,
 		"xoffset": xOffset,
 		"yoffset": yOffset,
@@ -76,30 +79,30 @@ func (elem *WebElement) MoveTo(xOffset float64, yOffset float64) error {
 
 func (elem *WebElement) ComputedLabel() (string, error) {
 	rUrl := fmt.Sprintf("/session/%%s/element/%s/computedlabel", elem.id)
-	response, err := elem.parent.computedLabel(rUrl)
+	response, err := elem.wd.computedLabel(rUrl)
 	return response, err
 }
 
 func (elem *WebElement) FindElement(by string, value string) (base.IWebElement, error) {
 	rUrl := fmt.Sprintf("/session/%%s/element/%s/element", elem.id)
-	response, err := elem.parent.find(by, value, "", rUrl)
+	response, err := elem.wd.find(by, value, "", rUrl)
 	if err != nil {
 		return nil, err
 	}
-	return elem.parent.DecodeElement(response)
+	return elem.wd.DecodeElement(response)
 }
 
 func (elem *WebElement) FindElements(by string, value string) ([]base.IWebElement, error) {
 	rUrl := fmt.Sprintf("/session/%%s/element/%s/element", elem.id)
-	response, err := elem.parent.find(by, value, "s", rUrl)
+	response, err := elem.wd.find(by, value, "s", rUrl)
 	if err != nil {
 		return nil, err
 	}
-	return elem.parent.DecodeElements(response)
+	return elem.wd.DecodeElements(response)
 }
 
 func (elem *WebElement) boolQuery(urlTemplate string) (bool, error) {
-	return elem.parent.boolCommand(fmt.Sprintf(urlTemplate, elem.id))
+	return elem.client.BoolCommand(fmt.Sprintf(urlTemplate, elem.id))
 }
 
 func (elem *WebElement) IsSelected() (bool, error) {
@@ -116,21 +119,20 @@ func (elem *WebElement) IsDisplayed() (bool, error) {
 
 func (elem *WebElement) GetProperty(name string) (string, error) {
 	template := "/session/%%s/element/%s/property/%s"
-	urlTemplate := fmt.Sprintf(template, elem.id, name)
-	return elem.parent.stringCommand(urlTemplate)
+	rUrl := fmt.Sprintf(template, elem.id, name)
+	return elem.client.StringCommand(rUrl)
 }
 
 func (elem *WebElement) GetAttribute(name string) (string, error) {
 	template := "/session/%%s/element/%s/attribute/%s"
-	urlTemplate := fmt.Sprintf(template, elem.id, name)
-	return elem.parent.stringCommand(urlTemplate)
+	rUrl := fmt.Sprintf(template, elem.id, name)
+	return elem.client.StringCommand(rUrl)
 }
 
 // rect implements the "Get Element Rect" method of the W3C standard.
 func (elem *WebElement) rect() (*base.Rect, error) {
-	wd := elem.parent
-	rUrl := wd.requestURL("/session/%s/element/%s/rect", wd.id, elem.id)
-	response, err := wd.execute("GET", rUrl, nil)
+	rUrl := elem.client.RequestURL("/session/%s/element/%s/rect", elem.client.GetId(), elem.id)
+	response, err := elem.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -142,33 +144,28 @@ func (elem *WebElement) rect() (*base.Rect, error) {
 }
 
 func (elem *WebElement) CSSProperty(name string) (string, error) {
-	wd := elem.parent
-	return wd.stringCommand(fmt.Sprintf("/session/%%s/element/%s/css/%s", elem.id, name))
+	return elem.client.StringCommand(fmt.Sprintf("/session/%%s/element/%s/css/%s", elem.id, name))
 }
 
 func (elem *WebElement) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{
-		"ELEMENT":            elem.id,
-		webElementIdentifier: elem.id,
-	})
+	return json.Marshal(map[string]string{"ELEMENT": elem.id, webElementIdentifier: elem.id})
 }
 
 func (elem *WebElement) Screenshot( /* scroll */ _ bool) ([]byte, error) {
-	data, err := elem.parent.stringCommand(fmt.Sprintf("/session/%%s/element/%s/screenshot", elem.id))
+	data, err := elem.client.StringCommand(fmt.Sprintf("/session/%%s/element/%s/screenshot", elem.id))
 	if err != nil {
 		return nil, err
 	}
 	buf := []byte(data)
 	decoder := base64.NewDecoder(base64.StdEncoding, bytes.NewBuffer(buf))
-	return ioutil.ReadAll(decoder)
+	return io.ReadAll(decoder)
 }
 
 func (elem *WebElement) location(suffix string) (*base.Point, error) {
-	if !elem.parent.w3cCompatible {
-		wd := elem.parent
+	if !elem.wd.w3cCompatible {
 		rPath := "/session/%s/element/%s/location" + suffix
-		rUrl := wd.requestURL(rPath, wd.id, elem.id)
-		response, err := wd.execute("GET", rUrl, nil)
+		rUrl := elem.client.RequestURL(rPath, elem.client.GetId(), elem.id)
+		response, err := elem.client.Execute("GET", rUrl, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -195,10 +192,9 @@ func (elem *WebElement) LocationInView() (*base.Point, error) {
 }
 
 func (elem *WebElement) Size() (*base.Size, error) {
-	if !elem.parent.w3cCompatible {
-		wd := elem.parent
-		rUrl := wd.requestURL("/session/%s/element/%s/size", wd.id, elem.id)
-		response, err := wd.execute("GET", rUrl, nil)
+	if !elem.wd.w3cCompatible {
+		rUrl := elem.client.RequestURL("/session/%s/element/%s/size", elem.client.GetId(), elem.id)
+		response, err := elem.client.Execute("GET", rUrl, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -215,6 +211,21 @@ func (elem *WebElement) Size() (*base.Size, error) {
 	}
 
 	return &base.Size{Width: rect.Width, Height: rect.Height}, nil
+}
+
+func (elem *WebElement) ScrollTo(deltaX int, deltaY int) error {
+	loc, err := elem.Location()
+	if err != nil {
+		return err
+	}
+	elem.wd.StoreWheelActions("wheel1", base.CreateWheelAction(int(loc.X), int(loc.Y), deltaX, deltaY))
+	if err = elem.wd.PerformActions(); err != nil {
+		return err
+	}
+	if err = elem.wd.ReleaseActions(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (elem *WebElement) Print() {

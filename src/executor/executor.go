@@ -186,15 +186,24 @@ func (e *Executor) doType(target string, value string) error {
 	if len(value) <= 0 {
 		return nil
 	}
-	by, data, err := e.computeSelector(target)
-	if err != nil {
-		return err
+	if len(target) > 0 {
+		by, data, err := e.computeSelector(target)
+		if err != nil {
+			return err
+		}
+		elm := e.adapter.FindElementReady(by, data, 2)
+		if elm == nil {
+			return fmt.Errorf("element isn't ready")
+		}
+		return e.adapter.SendKeys(elm, by, value)
 	}
-	elm := e.adapter.FindElementReady(by, data, 2)
-	if elm == nil {
-		return fmt.Errorf("element isn't ready")
+	for _, v := range []rune(value) {
+		time.Sleep(time.Millisecond * 100)
+		if err := e.adapter.KeyDown(string(v)); err != nil {
+			return err
+		}
 	}
-	return e.adapter.SendKeys(elm, by, value)
+	return nil
 }
 
 func (e *Executor) doRunScript(script string, args []interface{}) error {
@@ -576,6 +585,34 @@ func (e *Executor) doSetWindowSize(target string) error {
 	return e.adapter.ResizeWindow("", width, height)
 }
 
+func (e *Executor) doScrollTo(target string, value string) error {
+	v := strings.Split(value, "x")
+	if len(v) < 2 {
+		return fmt.Errorf("invalid value")
+	}
+	x, _ := strconv.Atoi(v[0])
+	y, _ := strconv.Atoi(v[1])
+	var elm base.IWebElement
+	if len(target) > 0 {
+		by, data, err := e.computeSelector(target)
+		if err != nil {
+			return err
+		}
+		if elm = e.adapter.FindElementReady(by, data, 2); elm == nil {
+			return fmt.Errorf("element isn't ready")
+		}
+	} else {
+		var err error
+		if elm, err = e.adapter.ActiveElement(); err != nil {
+			return err
+		}
+	}
+	if err := elm.MoveTo(0, 0); err != nil {
+		return err
+	}
+	return elm.ScrollTo(x, y)
+}
+
 func (e *Executor) commandExec(id string, command string, target string, until string, value string) error {
 	var err error
 	start := time.Now()
@@ -668,6 +705,8 @@ func (e *Executor) commandExec(id string, command string, target string, until s
 		err = e.doStatus(id)
 	case "pause":
 		err = e.doPause(target)
+	case "scrollTo":
+		err = e.doScrollTo(target, value)
 	case "noop":
 		//nothing to do
 	default:

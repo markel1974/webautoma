@@ -69,4 +69,7 @@ type IWebElement interface {
 
 	// Print information
 	Print()
+
+	// ScrollTo ...
+	ScrollTo(x int, y int) error
 }

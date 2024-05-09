@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"github.com/markel1974/webautoma/src/wd/base"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -78,26 +77,19 @@ func parseVersion(v string) (semver.Version, error) {
 }
 
 type WebDriver struct {
-	id             string
-	urlPrefix      string
 	capabilities   base.Capabilities
 	w3cCompatible  bool
 	storedActions  Actions
 	browser        string
 	browserVersion semver.Version
-	client         *http.Client
 	debug          bool
+	client         *Client
 }
 
 func NewWebDriver(client *http.Client, capabilities base.Capabilities, wdUrl *url.URL, debug bool) *WebDriver {
-	if client == nil {
-		//client = http.DefaultClient
-		client = NewDefaultClient()
-	}
 	wd := &WebDriver{
-		urlPrefix:    wdUrl.String(),
+		client:       NewClient(client, wdUrl.String(), debug),
 		capabilities: capabilities,
-		client:       client,
 		debug:        debug,
 	}
 	if b := capabilities["browserName"]; b != nil {
@@ -119,12 +111,12 @@ func (wd *WebDriver) DeleteSession(urlPrefix, id string) error {
 		return err
 	}
 	u.Path = path.Join(u.Path, "session", id)
-	return wd.voidParamsCommand("DELETE", u.String(), nil)
+	return wd.client.VoidParamsCommand("DELETE", u.String(), nil)
 }
 
 func (wd *WebDriver) Status() (*base.Status, error) {
-	rUrl := wd.requestURL("/status")
-	reply, err := wd.execute("GET", rUrl, nil)
+	rUrl := wd.client.RequestURL("/status")
+	reply, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +156,8 @@ func (wd *WebDriver) NewSession() (string, error) {
 		if err != nil {
 			return "", err
 		}
-
-		response, err := wd.execute("POST", wd.requestURL("/session"), data)
+		rUrl := wd.client.RequestURL("/session")
+		response, err := wd.client.Execute("POST", rUrl, data)
 		if err != nil {
 			return "", err
 		}
@@ -182,7 +174,7 @@ func (wd *WebDriver) NewSession() (string, error) {
 			continue
 		}
 		if reply.SessionID != nil {
-			wd.id = *reply.SessionID
+			wd.client.SetId(*reply.SessionID)
 		}
 
 		if len(reply.Value) > 0 {
@@ -218,8 +210,8 @@ func (wd *WebDriver) NewSession() (string, error) {
 			if err := json.Unmarshal(reply.Value, &value); err != nil {
 				return "", fmt.Errorf("error unmarshalling value: %v", err)
 			}
-			if value.SessionID != "" && wd.id == "" {
-				wd.id = value.SessionID
+			if value.SessionID != "" && wd.client.GetId() == "" {
+				wd.client.SetId(value.SessionID)
 			}
 			var cs returnedCapabilities
 			if value.Capabilities != nil {
@@ -241,23 +233,23 @@ func (wd *WebDriver) NewSession() (string, error) {
 				wd.browserVersion = v
 			}
 		}
-		return wd.id, nil
+		return wd.client.GetId(), nil
 	}
 	return "", fmt.Errorf("unreachable")
 }
 
 func (wd *WebDriver) SessionID() string {
-	return wd.id
+	return wd.client.GetId()
 }
 
 func (wd *WebDriver) SwitchSession(sessionID string) error {
-	wd.id = sessionID
+	wd.client.SetId(sessionID)
 	return nil
 }
 
 func (wd *WebDriver) Capabilities() (base.Capabilities, error) {
-	rUrl := wd.requestURL("/session/%s", wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s", wd.client.GetId())
+	response, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -272,66 +264,67 @@ func (wd *WebDriver) Capabilities() (base.Capabilities, error) {
 
 func (wd *WebDriver) SetAsyncScriptTimeout(timeout time.Duration) error {
 	if !wd.w3cCompatible {
-		return wd.voidCommand("/session/%s/timeouts/async_script", map[string]uint{
+		return wd.client.VoidCommand("/session/%s/timeouts/async_script", map[string]uint{
 			"ms": uint(timeout / time.Millisecond),
 		})
 	}
-	return wd.voidCommand("/session/%s/timeouts", map[string]uint{
+	return wd.client.VoidCommand("/session/%s/timeouts", map[string]uint{
 		"script": uint(timeout / time.Millisecond),
 	})
 }
 
 func (wd *WebDriver) SetImplicitWaitTimeout(timeout time.Duration) error {
 	if !wd.w3cCompatible {
-		return wd.voidCommand("/session/%s/timeouts/implicit_wait", map[string]uint{
+		return wd.client.VoidCommand("/session/%s/timeouts/implicit_wait", map[string]uint{
 			"ms": uint(timeout / time.Millisecond),
 		})
 	}
-	return wd.voidCommand("/session/%s/timeouts", map[string]uint{
+	return wd.client.VoidCommand("/session/%s/timeouts", map[string]uint{
 		"implicit": uint(timeout / time.Millisecond),
 	})
 }
 
 func (wd *WebDriver) SetPageLoadTimeout(timeout time.Duration) error {
 	if !wd.w3cCompatible {
-		return wd.voidCommand("/session/%s/timeouts", map[string]interface{}{
+		return wd.client.VoidCommand("/session/%s/timeouts", map[string]interface{}{
 			"ms":   uint(timeout / time.Millisecond),
 			"type": "page load",
 		})
 	}
-	return wd.voidCommand("/session/%s/timeouts", map[string]uint{
+	return wd.client.VoidCommand("/session/%s/timeouts", map[string]uint{
 		"pageLoad": uint(timeout / time.Millisecond),
 	})
 }
 
 func (wd *WebDriver) Quit() error {
-	if wd.id == "" {
+	if wd.client.GetId() == "" {
 		return nil
 	}
-	_, err := wd.execute("DELETE", wd.requestURL("/session/%s", wd.id), nil)
+	rUrl := wd.client.RequestURL("/session/%s", wd.client.GetId())
+	_, err := wd.client.Execute("DELETE", rUrl, nil)
 	if err == nil {
-		wd.id = ""
+		wd.client.SetId("")
 	}
 	return err
 }
 
 func (wd *WebDriver) CurrentWindowHandle() (string, error) {
 	if !wd.w3cCompatible {
-		return wd.stringCommand("/session/%s/window_handle")
+		return wd.client.StringCommand("/session/%s/window_handle")
 	}
-	return wd.stringCommand("/session/%s/window")
+	return wd.client.StringCommand("/session/%s/window")
 }
 
 func (wd *WebDriver) WindowHandles() ([]string, error) {
 	if !wd.w3cCompatible {
-		return wd.stringsCommand("/session/%s/window_handles")
+		return wd.client.StringsCommand("/session/%s/window_handles")
 	}
-	return wd.stringsCommand("/session/%s/window/handles")
+	return wd.client.StringsCommand("/session/%s/window/handles")
 }
 
 func (wd *WebDriver) CurrentURL() (string, error) {
-	rUrl := wd.requestURL("/session/%s/url", wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/url", wd.client.GetId())
+	response, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return "", err
 	}
@@ -343,44 +336,44 @@ func (wd *WebDriver) CurrentURL() (string, error) {
 	return *reply.Value, nil
 }
 
-func (wd *WebDriver) Navigate(rUrl string) error {
-	lowerUrl := strings.ToLower(rUrl)
+func (wd *WebDriver) Navigate(navigateUrl string) error {
+	lowerUrl := strings.ToLower(navigateUrl)
 	if strings.HasPrefix(lowerUrl, "file") {
 		//
 	} else {
 		if !strings.HasPrefix(lowerUrl, "http") {
-			rUrl = "https://" + rUrl
+			navigateUrl = "https://" + navigateUrl
 		}
 	}
-	rUrl = strings.TrimSpace(rUrl)
-	requestURL := wd.requestURL("/session/%s/url", wd.id)
-	params := map[string]string{"url": rUrl}
+	navigateUrl = strings.TrimSpace(navigateUrl)
+	rUrl := wd.client.RequestURL("/session/%s/url", wd.client.GetId())
+	params := map[string]string{"url": navigateUrl}
 	data, err := json.Marshal(params)
 	if err != nil {
 		return err
 	}
-	_, err = wd.execute("POST", requestURL, data)
+	_, err = wd.client.Execute("POST", rUrl, data)
 	return err
 }
 
 func (wd *WebDriver) Forward() error {
-	return wd.voidCommand("/session/%s/forward", nil)
+	return wd.client.VoidCommand("/session/%s/forward", nil)
 }
 
 func (wd *WebDriver) Back() error {
-	return wd.voidCommand("/session/%s/back", nil)
+	return wd.client.VoidCommand("/session/%s/back", nil)
 }
 
 func (wd *WebDriver) Refresh() error {
-	return wd.voidCommand("/session/%s/refresh", nil)
+	return wd.client.VoidCommand("/session/%s/refresh", nil)
 }
 
 func (wd *WebDriver) Title() (string, error) {
-	return wd.stringCommand("/session/%s/title")
+	return wd.client.StringCommand("/session/%s/title")
 }
 
 func (wd *WebDriver) PageSource() (string, error) {
-	return wd.stringCommand("/session/%s/source")
+	return wd.client.StringCommand("/session/%s/source")
 }
 
 func (wd *WebDriver) DecodeElement(data []byte) (base.IWebElement, error) {
@@ -388,15 +381,11 @@ func (wd *WebDriver) DecodeElement(data []byte) (base.IWebElement, error) {
 	if err := json.Unmarshal(data, &reply); err != nil {
 		return nil, err
 	}
-
 	id := elementIDFromValue(reply.Value)
 	if id == "" {
 		return nil, fmt.Errorf("invalid element returned: %+v", reply)
 	}
-	return &WebElement{
-		parent: wd,
-		id:     id,
-	}, nil
+	return NewWebElement(wd, wd.client, id), nil
 }
 
 func (wd *WebDriver) DecodeElements(data []byte) ([]base.IWebElement, error) {
@@ -404,19 +393,14 @@ func (wd *WebDriver) DecodeElements(data []byte) ([]base.IWebElement, error) {
 	if err := json.Unmarshal(data, reply); err != nil {
 		return nil, err
 	}
-
 	elements := make([]base.IWebElement, len(reply.Value))
 	for i, elem := range reply.Value {
 		id := elementIDFromValue(elem)
 		if id == "" {
 			return nil, fmt.Errorf("invalid element returned: %+v", reply)
 		}
-		elements[i] = &WebElement{
-			parent: wd,
-			id:     id,
-		}
+		elements[i] = NewWebElement(wd, wd.client, id)
 	}
-
 	return elements, nil
 }
 
@@ -443,8 +427,8 @@ func (wd *WebDriver) FindElements(by, value string) ([]base.IWebElement, error) 
 }
 
 func (wd *WebDriver) Close() error {
-	rUrl := wd.requestURL("/session/%s/window", wd.id)
-	_, err := wd.execute("DELETE", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/window", wd.client.GetId())
+	_, err := wd.client.Execute("DELETE", rUrl, nil)
 	return err
 }
 
@@ -461,8 +445,8 @@ func (wd *WebDriver) MaximizeWindow(name string) error {
 				return err
 			}
 		}
-		rUrl := wd.requestURL("/session/%s/window/%s/maximize", wd.id, name)
-		_, err := wd.execute("POST", rUrl, nil)
+		rUrl := wd.client.RequestURL("/session/%s/window/%s/maximize", wd.client.GetId(), name)
+		_, err := wd.client.Execute("POST", rUrl, nil)
 		return err
 	}
 	return wd.modifyWindow(name, "POST", "maximize", map[string]string{})
@@ -506,7 +490,7 @@ func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 	default:
 		return fmt.Errorf("invalid type %T", frame)
 	}
-	err := wd.voidCommand("/session/%s/frame", params)
+	err := wd.client.VoidCommand("/session/%s/frame", params)
 	if err != nil {
 		return err
 	}
@@ -522,12 +506,12 @@ func (wd *WebDriver) SwitchWindow(handle string) error {
 	} else {
 		params["handle"] = handle
 	}
-	return wd.voidCommand("/session/%s/window", params)
+	return wd.client.VoidCommand("/session/%s/window", params)
 }
 
 // SwitchParentFrame changes focus to parent frame on the page.
 func (wd *WebDriver) SwitchParentFrame() error {
-	return wd.voidCommand("/session/%s/frame/parent", nil) //wd.id)
+	return wd.client.VoidCommand("/session/%s/frame/parent", nil) //wd.client.GetId())
 }
 
 func (wd *WebDriver) ActiveElement() (base.IWebElement, error) {
@@ -535,8 +519,8 @@ func (wd *WebDriver) ActiveElement() (base.IWebElement, error) {
 	if wd.browser == "firefox" && wd.browserVersion.Major < 47 {
 		verb = "POST"
 	}
-	rUrl := wd.requestURL("/session/%s/element/active", wd.id)
-	response, err := wd.execute(verb, rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/element/active", wd.client.GetId())
+	response, err := wd.client.Execute(verb, rUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -556,15 +540,12 @@ func (wd *WebDriver) GetCookie(name string) (base.Cookie, error) {
 		}
 		return base.Cookie{}, errors.New("cookie not found")
 	}
-	rUrl := wd.requestURL("/session/%s/cookie/%s", wd.id, name)
-	data, err := wd.execute("GET", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/cookie/%s", wd.client.GetId(), name)
+	data, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return base.Cookie{}, err
 	}
-
-	// GeckoDriver returns a list of cookies for this method. Try both a single
-	// cookie and a list.
-	//
+	// GeckoDriver returns a list of cookies for this method. Try both a single cookie and a list.
 	// https://github.com/mozilla/geckodriver/issues/761
 	reply := new(struct{ Value base.Cookie })
 	if err := json.Unmarshal(data, reply); err == nil {
@@ -581,8 +562,8 @@ func (wd *WebDriver) GetCookie(name string) (base.Cookie, error) {
 }
 
 func (wd *WebDriver) GetCookies() ([]base.Cookie, error) {
-	rUrl := wd.requestURL("/session/%s/cookie", wd.id)
-	data, err := wd.execute("GET", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/cookie", wd.client.GetId())
+	data, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -600,35 +581,35 @@ func (wd *WebDriver) GetCookies() ([]base.Cookie, error) {
 }
 
 func (wd *WebDriver) AddCookie(cookie *base.Cookie) error {
-	return wd.voidCommand("/session/%s/cookie", map[string]*base.Cookie{"cookie": cookie})
+	return wd.client.VoidCommand("/session/%s/cookie", map[string]*base.Cookie{"cookie": cookie})
 }
 
 func (wd *WebDriver) DeleteAllCookies() error {
-	rUrl := wd.requestURL("/session/%s/cookie", wd.id)
-	_, err := wd.execute("DELETE", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/cookie", wd.client.GetId())
+	_, err := wd.client.Execute("DELETE", rUrl, nil)
 	return err
 }
 
 func (wd *WebDriver) DeleteCookie(name string) error {
-	rUrl := wd.requestURL("/session/%s/cookie/%s", wd.id, name)
-	_, err := wd.execute("DELETE", rUrl, nil)
+	rUrl := wd.client.RequestURL("/session/%s/cookie/%s", wd.client.GetId(), name)
+	_, err := wd.client.Execute("DELETE", rUrl, nil)
 	return err
 }
 
 func (wd *WebDriver) Click(button int) error {
-	return wd.voidCommand("/session/%s/click", map[string]int{"button": button})
+	return wd.client.VoidCommand("/session/%s/click", map[string]int{"button": button})
 }
 
 func (wd *WebDriver) DoubleClick() error {
-	return wd.voidCommand("/session/%s/doubleclick", nil)
+	return wd.client.VoidCommand("/session/%s/doubleclick", nil)
 }
 
 func (wd *WebDriver) ButtonDown() error {
-	return wd.voidCommand("/session/%s/buttondown", nil)
+	return wd.client.VoidCommand("/session/%s/buttondown", nil)
 }
 
 func (wd *WebDriver) ButtonUp() error {
-	return wd.voidCommand("/session/%s/buttonup", nil)
+	return wd.client.VoidCommand("/session/%s/buttonup", nil)
 }
 
 func (wd *WebDriver) SendModifier(modifier string, isDown bool) error {
@@ -640,9 +621,8 @@ func (wd *WebDriver) SendModifier(modifier string, isDown bool) error {
 
 func (wd *WebDriver) KeyDown(keys string) error {
 	// Selenium implemented the actions API but has not yet updated its new session response.
-
 	if !wd.w3cCompatible && !(wd.browser == "firefox" && wd.browserVersion.Major > 47) {
-		return wd.voidCommand("/session/%s/keys", wd.processKeyString(keys))
+		return wd.client.VoidCommand("/session/%s/keys", wd.processKeyString(keys))
 	}
 	return wd.keyAction("keyDown", keys)
 }
@@ -693,7 +673,7 @@ func (wd *WebDriver) StoreWheelActions(inputID string, actions ...base.WheelActi
 }
 
 func (wd *WebDriver) PerformActions() error {
-	err := wd.voidCommand("/session/%s/actions", map[string]interface{}{
+	err := wd.client.VoidCommand("/session/%s/actions", map[string]interface{}{
 		"actions": wd.storedActions,
 	})
 	wd.storedActions = nil
@@ -701,24 +681,25 @@ func (wd *WebDriver) PerformActions() error {
 }
 
 func (wd *WebDriver) ReleaseActions() error {
-	return wd.voidParamsCommand("DELETE", wd.requestURL("/session/%s/actions", wd.id), nil)
+	rUrl := wd.client.RequestURL("/session/%s/actions", wd.client.GetId())
+	return wd.client.VoidParamsCommand("DELETE", rUrl, nil)
 }
 
 func (wd *WebDriver) DismissAlert() error {
-	return wd.voidCommand("/session/%s/alert/dismiss", nil)
+	return wd.client.VoidCommand("/session/%s/alert/dismiss", nil)
 }
 
 func (wd *WebDriver) AcceptAlert() error {
-	return wd.voidCommand("/session/%s/alert/accept", nil)
+	return wd.client.VoidCommand("/session/%s/alert/accept", nil)
 }
 
 func (wd *WebDriver) AlertText() (string, error) {
-	return wd.stringCommand("/session/%s/alert/text")
+	return wd.client.StringCommand("/session/%s/alert/text")
 }
 
 func (wd *WebDriver) SetAlertText(text string) error {
 	data := map[string]string{"text": text}
-	return wd.voidCommand("/session/%s/alert/text", data)
+	return wd.client.VoidCommand("/session/%s/alert/text", data)
 }
 
 func (wd *WebDriver) ExecuteScript(script string, args []interface{}) (interface{}, error) {
@@ -750,7 +731,7 @@ func (wd *WebDriver) ExecuteScriptAsyncRaw(script string, args []interface{}) ([
 }
 
 func (wd *WebDriver) Screenshot() ([]byte, error) {
-	data, err := wd.stringCommand("/session/%s/screenshot")
+	data, err := wd.client.StringCommand("/session/%s/screenshot")
 	if err != nil {
 		return nil, err
 	}
@@ -785,17 +766,16 @@ func (wd *WebDriver) Wait(condition base.Condition) error {
 }
 
 func (wd *WebDriver) Log(kind base.LogType) ([]base.LogMessage, error) {
-	rUrl := wd.requestURL("/session/%s/log", wd.id)
 	params := map[string]base.LogType{"type": kind}
 	data, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	response, err := wd.execute("POST", rUrl, data)
+	rUrl := wd.client.RequestURL("/session/%s/log", wd.client.GetId())
+	response, err := wd.client.Execute("POST", rUrl, data)
 	if err != nil {
 		return nil, err
 	}
-
 	c := new(struct {
 		Value []struct {
 			Timestamp int64
@@ -806,7 +786,6 @@ func (wd *WebDriver) Log(kind base.LogType) ([]base.LogMessage, error) {
 	if err = json.Unmarshal(response, c); err != nil {
 		return nil, err
 	}
-
 	val := make([]base.LogMessage, len(c.Value))
 	for i, v := range c.Value {
 		val[i] = base.LogMessage{
@@ -817,183 +796,12 @@ func (wd *WebDriver) Log(kind base.LogType) ([]base.LogMessage, error) {
 			Message:   v.Message,
 		}
 	}
-
 	return val, nil
 }
 
-func (wd *WebDriver) requestURL(template string, args ...interface{}) string {
-	u := wd.urlPrefix + fmt.Sprintf(template, args...)
-	return u
-}
-
-func (wd *WebDriver) newRequest(method string, url string, data []byte) (*http.Request, error) {
-	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Add("Accept", DefaultContentType)
-	return request, nil
-}
-
-func (wd *WebDriver) execute(method string, url string, data []byte) (json.RawMessage, error) {
-	buildError := func(err error) error {
-		return fmt.Errorf("[method: %s] [url: %s] [error: %s]", method, url, err.Error())
-	}
-	request, err := wd.newRequest(method, url, data)
-	if err != nil {
-		return nil, buildError(err)
-	}
-
-	var response *http.Response
-	var buf []byte
-
-	if response, err = wd.client.Do(request); err == nil {
-		if response.Body != nil {
-			buf, err = io.ReadAll(response.Body)
-			_ = response.Body.Close()
-		} else {
-			err = buildError(errors.New("empty body"))
-		}
-	}
-
-	if err != nil {
-		return nil, buildError(err)
-	}
-
-	if wd.debug {
-		fmt.Printf("%s %s %s --> %s [%s]\n", method, url, data, response.Status, response.Header["Content-Type"])
-		if err != nil {
-			fmt.Println(buildError(err))
-		} else {
-			var pretty bytes.Buffer
-			if err := json.Indent(&pretty, buf, "", "	"); err == nil {
-				fmt.Println(pretty.String())
-			} else {
-				fmt.Println(string(buf))
-			}
-		}
-	}
-
-	if err != nil {
-		return nil, buildError(errors.New(response.Status))
-	}
-
-	fullCType := response.Header.Get("Content-Type")
-	cType, _, err := mime.ParseMediaType(fullCType)
-	if err != nil {
-		return nil, buildError(fmt.Errorf("got content type header %q, expected %q", fullCType, DefaultContentType))
-	}
-	if cType != DefaultContentType {
-		return nil, buildError(fmt.Errorf("got content type %q, expected %q", cType, DefaultContentType))
-	}
-
-	reply := new(ServerReply)
-	if err = json.Unmarshal(buf, reply); err != nil {
-		if response.StatusCode != http.StatusOK {
-			return nil, buildError(fmt.Errorf("bad server reply status: %s", response.Status))
-		}
-		return nil, buildError(err)
-	}
-	if reply.Err != "" {
-		return nil, buildError(&reply.Error)
-	}
-
-	// Handle the W3C-compliant error format. In the W3C spec, the error is embedded in the 'value' field.
-	if len(reply.Value) > 0 {
-		respErr := new(base.Error)
-		if err = json.Unmarshal(reply.Value, respErr); err == nil && respErr.Err != "" {
-			respErr.HTTPCode = response.StatusCode
-			return nil, buildError(respErr)
-		}
-	}
-
-	// Handle the legacy error format.
-	const success = 0
-	if reply.Status != success {
-		shortMsg, ok := base.RemoteErrors[reply.Status]
-		if !ok {
-			shortMsg = fmt.Sprintf("unknown error - %d", reply.Status)
-		}
-		longMsg := new(struct {
-			Message string
-		})
-		if err = json.Unmarshal(reply.Value, longMsg); err != nil {
-			return nil, buildError(errors.New(shortMsg))
-		}
-		return nil, &base.Error{
-			Err:        shortMsg,
-			Message:    longMsg.Message,
-			HTTPCode:   response.StatusCode,
-			LegacyCode: reply.Status,
-		}
-	}
-	return buf, nil
-}
-
-func (wd *WebDriver) stringCommand(urlTemplate string) (string, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return "", err
-	}
-
-	reply := new(struct{ Value *string })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return "", err
-	}
-
-	if reply.Value == nil {
-		return "", fmt.Errorf("nil return value")
-	}
-
-	return *reply.Value, nil
-}
-
-func (wd *WebDriver) voidCommand(urlTemplate string, params interface{}) error {
-	err := wd.voidParamsCommand("POST", wd.requestURL(urlTemplate, wd.id), params)
-	return err
-}
-
-func (wd *WebDriver) voidParamsCommand(method, url string, params interface{}) error {
-	if params == nil {
-		params = make(map[string]interface{})
-	}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return err
-	}
-	_, err = wd.execute(method, url, data)
-	return err
-}
-
-func (wd *WebDriver) stringsCommand(urlTemplate string) ([]string, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	reply := new(struct{ Value []string })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return nil, err
-	}
-	return reply.Value, nil
-}
-
-func (wd *WebDriver) boolCommand(urlTemplate string) (bool, error) {
-	rUrl := wd.requestURL(urlTemplate, wd.id)
-	response, err := wd.execute("GET", rUrl, nil)
-	if err != nil {
-		return false, err
-	}
-	reply := new(struct{ Value bool })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return false, err
-	}
-	return reply.Value, nil
-}
-
 func (wd *WebDriver) computedLabel(url string) (string, error) {
-	response, err := wd.execute("GET", wd.requestURL(url, wd.id), nil)
+	rUrl := wd.client.RequestURL(url, wd.client.GetId())
+	response, err := wd.client.Execute("GET", rUrl, nil)
 	if err != nil {
 		return "", err
 	}
@@ -1028,8 +836,8 @@ func (wd *WebDriver) find(by string, value string, suffix string, url string) ([
 	if len(url) == 0 {
 		url = "/session/%s/element"
 	}
-
-	return wd.execute("POST", wd.requestURL(url+suffix, wd.id), data)
+	rUrl := wd.client.RequestURL(url+suffix, wd.client.GetId())
+	return wd.client.Execute("POST", rUrl, data)
 }
 
 func (wd *WebDriver) modifyWindow(handle string, verb string, command string, params interface{}) error {
@@ -1051,12 +859,12 @@ func (wd *WebDriver) modifyWindow(handle string, verb string, command string, pa
 		}
 	}
 
-	rUrl := wd.requestURL("/session/%s/window", wd.id)
+	rUrl := wd.client.RequestURL("/session/%s/window", wd.client.GetId())
 	if command != "" {
 		if wd.w3cCompatible {
-			rUrl = wd.requestURL("/session/%s/window/%s", wd.id, command)
+			rUrl = wd.client.RequestURL("/session/%s/window/%s", wd.client.GetId(), command)
 		} else {
-			rUrl = wd.requestURL("/session/%s/window/%s/%s", wd.id, handle, command)
+			rUrl = wd.client.RequestURL("/session/%s/window/%s/%s", wd.client.GetId(), handle, command)
 		}
 	}
 
@@ -1068,7 +876,7 @@ func (wd *WebDriver) modifyWindow(handle string, verb string, command string, pa
 		}
 	}
 
-	if _, err := wd.execute(verb, rUrl, data); err != nil {
+	if _, err := wd.client.Execute(verb, rUrl, data); err != nil {
 		return err
 	}
 
@@ -1094,7 +902,7 @@ func (wd *WebDriver) keyAction(action, keys string) error {
 			Key:  string(key),
 		})
 	}
-	return wd.voidCommand("/session/%s/actions", map[string]interface{}{
+	return wd.client.VoidCommand("/session/%s/actions", map[string]interface{}{
 		"actions": []interface{}{
 			map[string]interface{}{
 				"type":    "key",
@@ -1102,6 +910,18 @@ func (wd *WebDriver) keyAction(action, keys string) error {
 				"actions": actions,
 			}},
 	})
+}
+
+func (wd *WebDriver) execScript(script string, args []interface{}, suffix string) (interface{}, error) {
+	response, err := wd.execScriptRaw(script, args, suffix)
+	if err != nil {
+		return nil, err
+	}
+	reply := new(struct{ Value interface{} })
+	if err = json.Unmarshal(response, reply); err != nil {
+		return nil, err
+	}
+	return reply.Value, nil
 }
 
 func (wd *WebDriver) execScriptRaw(script string, args []interface{}, suffix string) ([]byte, error) {
@@ -1115,17 +935,6 @@ func (wd *WebDriver) execScriptRaw(script string, args []interface{}, suffix str
 	if err != nil {
 		return nil, err
 	}
-	return wd.execute("POST", wd.requestURL("/session/%s/execute"+suffix, wd.id), data)
-}
-
-func (wd *WebDriver) execScript(script string, args []interface{}, suffix string) (interface{}, error) {
-	response, err := wd.execScriptRaw(script, args, suffix)
-	if err != nil {
-		return nil, err
-	}
-	reply := new(struct{ Value interface{} })
-	if err = json.Unmarshal(response, reply); err != nil {
-		return nil, err
-	}
-	return reply.Value, nil
+	rUrl := wd.client.RequestURL("/session/%s/execute"+suffix, wd.client.GetId())
+	return wd.client.Execute("POST", rUrl, data)
 }

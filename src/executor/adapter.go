@@ -369,9 +369,9 @@ func (e *Adapter) MouseActions(elm base.IWebElement, command string, value strin
 		err = nil
 		switch command {
 		case "click":
-			if err = elm.MoveTo(0, 0); err == nil {
-				err = elm.Click()
-			}
+			//if err = elm.MoveTo(0, 0); err == nil {
+			err = elm.Click()
+			//}
 		case "doubleClick":
 			if err = elm.MoveTo(0, 0); err == nil {
 				err = e.driver.DoubleClick() //e.DoubleClick()
