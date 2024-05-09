@@ -43,7 +43,7 @@ const (
 
 const (
 	// legacyWebElementIdentifier is the string constant used in the old
-	// WebDriver JSON protocol that is the key for the map that contains an
+	// WebDriver JSON protocol that is the key for the map that contains a
 	// unique element identifier.
 	legacyWebElementIdentifier = "ELEMENT"
 
@@ -497,8 +497,7 @@ func (wd *WebDriver) SwitchFrame(frame interface{}) error {
 	return nil
 }
 
-// SwitchWindow changes focus to another window. The window to change focus to may be specified
-// by it's server assigned window handle.
+// SwitchWindow changes focus to another window. The window to change focus to may be specified by server assigned window handle.
 func (wd *WebDriver) SwitchWindow(handle string) error {
 	params := make(map[string]string)
 	if !wd.w3cCompatible {
@@ -842,7 +841,7 @@ func (wd *WebDriver) find(by string, value string, suffix string, url string) ([
 
 func (wd *WebDriver) modifyWindow(handle string, verb string, command string, params interface{}) error {
 	// The original protocol allowed for maximizing any named window. The W3C
-	// specification only allows the current window be be modified. Emulate the
+	// specification only allows the current window be modified. Emulate the
 	// previous behavior by switching to the target window, maximizing the
 	// current window, and switching back to the original window.
 	var startWindow string
