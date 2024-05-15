@@ -3,7 +3,6 @@ package executor
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/markel1974/webautoma/src/wd/base"
@@ -159,6 +158,10 @@ func (e *Adapter) SetImageSize(w int, h int) {
 	}
 }
 
+func (e *Adapter) Close() error {
+	return e.driver.Close()
+}
+
 func (e *Adapter) Navigate(url string) error {
 	return e.driver.Navigate(url)
 }
@@ -246,6 +249,14 @@ func (e *Adapter) Status() (string, error) {
 	})
 }
 
+func (e *Adapter) DeleteCookie(id string) error {
+	return e.tester(e.wait, func() error { return e.driver.DeleteCookie(id) })
+}
+
+func (e *Adapter) DeleteAllCookies() error {
+	return e.tester(e.wait, func() error { return e.driver.DeleteAllCookies() })
+}
+
 func (e *Adapter) GetCookie(id string) (string, error) {
 	return e.testerString(e.wait, func() (string, error) {
 		cookie, err := e.driver.GetCookie(id)
@@ -268,20 +279,8 @@ func (e *Adapter) GetCookies() (string, error) {
 	})
 }
 
-func (e *Adapter) DeleteCookie(id string) error {
-	return e.tester(e.wait, func() error { return e.driver.DeleteCookie(id) })
-}
-
-func (e *Adapter) DeleteAllCookies() error {
-	return e.tester(e.wait, func() error { return e.driver.DeleteAllCookies() })
-}
-
 func (e *Adapter) KeyDown(keys string) error {
 	return e.tester(e.wait, func() error { return e.driver.KeyDown(keys) })
-}
-
-func (e *Adapter) Close() error {
-	return e.driver.Close()
 }
 
 func (e *Adapter) ResizeWindow(handle string, w int, h int) error {
@@ -300,59 +299,63 @@ func (e *Adapter) ElementMoveTo(elm base.IWebElement, xOffset float64, yOffset f
 	return e.tester(e.wait, func() error { return elm.MoveTo(xOffset, yOffset) })
 }
 
-func (e *Adapter) FindElement(by string, data string) (base.IWebElement, error) {
-	return e.testerElement(e.wait, func() (base.IWebElement, error) { return e.driver.FindElement(by, data) })
+func (e *Adapter) _findElementReady(by string, data string, until int) (base.IWebElement, bool) {
+	found := false
+	elem, _ := e.driver.FindElement(by, data)
+	if until == 0 {
+		found = elem != nil
+	} else if until == 1 {
+		if elem != nil {
+			if !e.isElementReady(by, data, elem) {
+				found = true
+				elem = nil
+			}
+		} else {
+			found = true
+		}
+	} else {
+		if elem != nil {
+			if e.isElementReady(by, data, elem) {
+				found = true
+			}
+		}
+	}
+	return elem, found
 }
 
 func (e *Adapter) FindElementReady(by string, data string, until int) base.IWebElement {
 	var elem base.IWebElement = nil
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
-		found := false
-		elem, _ = e.driver.FindElement(by, data)
-		if until == 0 {
-			found = elem != nil
-		} else if until == 1 {
-			if elem != nil {
-				if !e.isElementReady(by, data, elem) {
-					found = true
-					elem = nil
-				}
-			} else {
-				found = true
-			}
-		} else {
-			if elem != nil {
-				if e.isElementReady(by, data, elem) {
-					found = true
-				}
-			}
-		}
+		var found bool
+		elem, found = e._findElementReady(by, data, until)
 		if found {
 			break
-		} else {
-			e.RetryWait()
 		}
+		e.RetryWait()
 	}
 	return elem
 }
 
-func (e *Adapter) SendKeys(elm base.IWebElement, by string, data string) error {
+func (e *Adapter) SendKeys(by string, data string, value string) error {
+	if len(value) == 0 {
+		return nil
+	}
 	var err error
 	pos := 0
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
-		if err = elm.SendKeys(string(data[pos])); err != nil {
-			if elm = e.FindElementReady(by, data, 2); elm == nil {
-				e.log(LogLevelDebug, fmt.Sprintf("(%s=%s) waitForType: element isn't ready", by, data))
-				return errors.New("element isn't ready")
-			}
+		elm, _ := e._findElementReady(by, data, 2)
+		if elm == nil {
+			err = fmt.Errorf("element isn't ready")
+		} else {
+			err = elm.SendKeys(string(value[pos]))
 		}
 		e.HumanWait()
 		if err == nil {
 			pos++
-			if pos >= len(data) {
+			if pos >= len(value) {
 				break
 			}
 		} else {
@@ -362,66 +365,68 @@ func (e *Adapter) SendKeys(elm base.IWebElement, by string, data string) error {
 	return nil
 }
 
-func (e *Adapter) MouseActions(elm base.IWebElement, command string, value string) error {
+func (e *Adapter) MouseActions(by string, data string, command string, value string) error {
 	var err error
 	var start = UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
 		err = nil
-		switch command {
-		case "click":
-			//if err = elm.MoveTo(0, 0); err == nil {
-			err = elm.Click()
-			//}
-		case "doubleClick":
-			if err = elm.MoveTo(0, 0); err == nil {
-				err = e.driver.DoubleClick()
-			}
-		case "rightClick":
-			if err = elm.MoveTo(0, 0); err == nil {
-				err = e.driver.Click(2)
-			}
-		case "mouseOver":
-			err = elm.MoveTo(0, 0)
-		case "mouseUpAt":
-			if e.drag != nil {
-				var coordsUpAt = e.getCoords(value)
-				if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err == nil {
-					err = e.driver.ButtonUp()
+		elm, _ := e._findElementReady(by, data, 2)
+		if elm == nil {
+			err = fmt.Errorf("element isn't ready (%s:%s)", by, data)
+		} else {
+			switch command {
+			case "click":
+				err = elm.Click()
+			case "doubleClick":
+				if err = elm.MoveTo(0, 0); err == nil {
+					err = e.driver.DoubleClick()
 				}
-				e.drag = nil
-			}
-		case "mouseDownAt":
-			var coordsDownAt = e.getCoords(value)
-			if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err == nil {
-				err = e.driver.ButtonDown()
-				e.drag = elm
-			}
-		case "mouseMultipleMoveAt":
-			if e.drag != nil {
-				baseCords := base.Point{X: 0, Y: 0}
-				for _, m := range strings.Split(value, "|") {
-					var coordsMultipleMoveAt = e.getCoords(m)
-					x := baseCords.X + coordsMultipleMoveAt.X
-					y := baseCords.Y + coordsMultipleMoveAt.Y
-					baseCords.X = x
-					baseCords.Y = y
-					if err = e.drag.MoveTo(x, y); err != nil {
-						break
+			case "rightClick":
+				if err = elm.MoveTo(0, 0); err == nil {
+					err = e.driver.Click(2)
+				}
+			case "mouseOver":
+				err = elm.MoveTo(0, 0)
+			case "mouseUpAt":
+				if e.drag != nil {
+					var coordsUpAt = e.getCoords(value)
+					if err = e.drag.MoveTo(coordsUpAt.X, coordsUpAt.Y); err == nil {
+						err = e.driver.ButtonUp()
 					}
-					e.HumanWait()
+					e.drag = nil
 				}
-			}
-		case "mouseMoveAt":
-			if e.drag != nil {
-				var coordsMoveAt = e.getCoords(value)
-				err = e.drag.MoveTo(coordsMoveAt.X, coordsMoveAt.Y)
+			case "mouseDownAt":
+				var coordsDownAt = e.getCoords(value)
+				if err = elm.MoveTo(coordsDownAt.X, coordsDownAt.Y); err == nil {
+					err = e.driver.ButtonDown()
+					e.drag = elm
+				}
+			case "mouseMultipleMoveAt":
+				if e.drag != nil {
+					baseCords := base.Point{X: 0, Y: 0}
+					for _, m := range strings.Split(value, "|") {
+						var coordsMultipleMoveAt = e.getCoords(m)
+						x := baseCords.X + coordsMultipleMoveAt.X
+						y := baseCords.Y + coordsMultipleMoveAt.Y
+						baseCords.X = x
+						baseCords.Y = y
+						if err = e.drag.MoveTo(x, y); err != nil {
+							break
+						}
+						e.HumanWait()
+					}
+				}
+			case "mouseMoveAt":
+				if e.drag != nil {
+					var coordsMoveAt = e.getCoords(value)
+					err = e.drag.MoveTo(coordsMoveAt.X, coordsMoveAt.Y)
+				}
 			}
 		}
 		if err == nil {
 			break
-		} else {
-			e.RetryWait()
 		}
+		e.RetryWait()
 	}
 	return err
 }

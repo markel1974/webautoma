@@ -178,11 +178,7 @@ func (e *Executor) doMouse(target string, command string, value string) error {
 	if err != nil {
 		return err
 	}
-	elm := e.adapter.FindElementReady(by, data, 2)
-	if elm == nil {
-		return fmt.Errorf("element isn't ready (%s)", target)
-	}
-	return e.adapter.MouseActions(elm, command, value)
+	return e.adapter.MouseActions(by, data, command, value)
 }
 
 func (e *Executor) doType(target string, value string) error {
@@ -194,11 +190,7 @@ func (e *Executor) doType(target string, value string) error {
 		if err != nil {
 			return err
 		}
-		elm := e.adapter.FindElementReady(by, data, 2)
-		if elm == nil {
-			return fmt.Errorf("element isn't ready")
-		}
-		return e.adapter.SendKeys(elm, by, value)
+		return e.adapter.SendKeys(by, data, value)
 	}
 	for _, v := range []rune(value) {
 		time.Sleep(time.Millisecond * 100)
@@ -329,22 +321,22 @@ func (e *Executor) doClose(target string) error {
 	return nil
 }
 
-func (e *Executor) doStackAdd(id string, target string, until string) error {
-	v := 0
-	if len(until) > 0 {
-		v = 1
+func (e *Executor) doStackAdd(id string, target string, u string) error {
+	until := 0
+	if len(u) > 0 {
+		until = 1
 	}
 	by, data, err := e.computeSelector(target)
 	if err != nil {
 		return err
 	}
-	if analyzedElm := e.adapter.FindElementReady(by, data, v); analyzedElm != nil {
+	if elm := e.adapter.FindElementReady(by, data, until); elm != nil {
 		values := make(map[string]interface{})
 		values["target"] = target
-		values["displayed"], _ = analyzedElm.IsDisplayed()
-		values["enabled"], _ = analyzedElm.IsEnabled()
-		values["text"], _ = analyzedElm.Text()
-		values["tagName"], _ = analyzedElm.TagName()
+		values["displayed"], _ = elm.IsDisplayed()
+		values["enabled"], _ = elm.IsEnabled()
+		values["text"], _ = elm.Text()
+		values["tagName"], _ = elm.TagName()
 		if e.stack == nil {
 			e.stack = make(map[string]interface{})
 		}
@@ -364,20 +356,20 @@ func (e *Executor) doStackReset() error {
 	return nil
 }
 
-func (e *Executor) doAssert(target string, until string, caption string) error {
-	v := 0
-	if len(until) > 0 {
-		v = 1
+func (e *Executor) doAssert(target string, u string, caption string) error {
+	until := 0
+	if len(u) > 0 {
+		until = 1
 	}
 	by, data, err := e.computeSelector(target)
 	if err != nil {
 		return err
 	}
-	existsElm := e.adapter.FindElementReady(by, data, v)
-	if existsElm == nil {
+	elm := e.adapter.FindElementReady(by, data, until)
+	if elm == nil {
 		return fmt.Errorf("element not exists")
 	}
-	text, err := existsElm.Text()
+	text, err := elm.Text()
 	if err != nil {
 		return err
 	}
@@ -387,31 +379,31 @@ func (e *Executor) doAssert(target string, until string, caption string) error {
 	return nil
 }
 
-func (e *Executor) doExists(target string, until string) error {
-	v := 0
-	if len(until) > 0 {
-		v = 1
+func (e *Executor) doExists(target string, u string) error {
+	until := 0
+	if len(u) > 0 {
+		until = 1
 	}
 	by, data, err := e.computeSelector(target)
 	if err != nil {
 		return err
 	}
-	if existsElm := e.adapter.FindElementReady(by, data, v); existsElm == nil {
+	if elm := e.adapter.FindElementReady(by, data, until); elm == nil {
 		return fmt.Errorf("element not exists")
 	}
 	return nil
 }
 
-func (e *Executor) doUntil(target string, until string) error {
-	v := 0
-	if len(until) > 0 {
-		v = 1
+func (e *Executor) doUntil(target string, u string) error {
+	until := 0
+	if len(u) > 0 {
+		until = 1
 	}
 	by, data, err := e.computeSelector(target)
 	if err != nil {
 		return err
 	}
-	if untilElm := e.adapter.FindElementReady(by, data, v); untilElm != nil {
+	if elm := e.adapter.FindElementReady(by, data, until); elm != nil {
 		return fmt.Errorf("element exists")
 	}
 	return nil
@@ -454,8 +446,6 @@ func (e *Executor) doSelect(target string, value string) error {
 		return err
 	}
 	for _, opt := range options {
-		//name, _ := k.Text()
-		//fmt.Println(name)
 		var computedLabel string
 		computedLabel, err = opt.ComputedLabel()
 		if err != nil {
