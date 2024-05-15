@@ -15,6 +15,11 @@ func RequiredLogs() (base.LogType, base.LogLevel) {
 	return base.LogPerformance, base.LogAll
 }
 
+const (
+	eventOK  = "Esito sonda ok"
+	eventNOK = "Errore nella sonda"
+)
+
 type Executor struct {
 	cfgFile   string
 	start     time.Time
@@ -142,6 +147,12 @@ func (e *Executor) computeSelector(target string) (string, string, error) {
 	return by, data, nil
 }
 
+func (e *Executor) createEvent(id string, err error, kind string, message string, start time.Time, dur int64, shot bool) {
+	event := e.adapter.CreateEvent(id, kind, err, start, dur, shot)
+	event.Message = message
+	e.logEvent(event)
+}
+
 func (e *Executor) doTimer(target string, until string, value string) error {
 	switch until {
 	case "timerCreate":
@@ -156,16 +167,17 @@ func (e *Executor) doTimer(target string, until string, value string) error {
 	case "timerStop":
 		if t, ok := e.timers[target]; ok {
 			t.Stop()
+			if strings.TrimSpace(strings.ToLower(value)) == "finalize" {
+				dur := t.Finalize()
+				e.createEvent(t.Id, nil, "full", eventOK, t.Start, dur, false)
+			}
 			return nil
 		}
 		return fmt.Errorf("unknown timer id (timerStop): %s", target)
 	case "timerFinalize":
 		if t, ok := e.timers[target]; ok {
-			start := t.Start
 			dur := t.Finalize()
-			event := e.adapter.CreateEvent(t.Id, "full", nil, start, dur, false)
-			event.Message = "Esito sonda ok"
-			e.logEvent(event)
+			e.createEvent(t.Id, nil, "full", eventOK, t.Start, dur, false)
 			return nil
 		}
 		return fmt.Errorf("unknown timer id (timerFinalize): %s", target)
@@ -579,12 +591,26 @@ func (e *Executor) doSetWindowSize(target string) error {
 }
 
 func (e *Executor) doScrollTo(target string, value string) error {
-	v := strings.Split(value, "x")
-	if len(v) < 2 {
+	var coords []string
+	step := 0
+	interval := 0
+	if strings.Contains(value, ",") {
+		container := strings.Split(value, ",")
+		if len(container) > 0 {
+			coords = strings.Split(container[0], "x")
+		}
+		if len(container) > 1 {
+			step, _ = strconv.Atoi(container[1])
+		}
+		if len(container) > 2 {
+			interval, _ = strconv.Atoi(container[2])
+		}
+	} else {
+		coords = strings.Split(value, "x")
+	}
+	if len(coords) < 2 {
 		return fmt.Errorf("invalid value")
 	}
-	x, _ := strconv.Atoi(v[0])
-	y, _ := strconv.Atoi(v[1])
 	var elm base.IWebElement
 	if len(target) > 0 {
 		by, data, err := e.computeSelector(target)
@@ -603,7 +629,26 @@ func (e *Executor) doScrollTo(target string, value string) error {
 	if err := elm.MoveTo(0, 0); err != nil {
 		return err
 	}
-	return elm.ScrollTo(x, y)
+	x, _ := strconv.Atoi(coords[0])
+	y, _ := strconv.Atoi(coords[1])
+	if step == 0 {
+		return elm.ScrollTo(x, y)
+	}
+	deltaX := x / step
+	deltaY := y / step
+	currentX := 0
+	currentY := 0
+	for k := 0; k <= step; k++ {
+		if err := elm.ScrollTo(currentX, currentY); err != nil {
+			return err
+		}
+		currentX += deltaX
+		currentY += deltaY
+		if interval > 0 {
+			e.adapter.Sleep(interval)
+		}
+	}
+	return nil
 }
 
 func (e *Executor) doNavigate(target string) error {
@@ -722,21 +767,18 @@ func (e *Executor) commandExec(id string, command string, target string, until s
 func (e *Executor) finalize(err error) {
 	for _, t := range e.timers {
 		if !t.Finalized {
-			start := t.Start
 			dur := t.Finalize()
-			event := e.adapter.CreateEvent(t.Id, "full", err, start, dur, false)
-			event.Message = "timer not finalized"
-			e.logEvent(event)
+			e.createEvent(t.Id, err, "full", "timer not finalized", t.Start, dur, false)
 		}
 	}
-	var dur = UnixMilli(time.Now()) - UnixMilli(e.start)
-	var event = e.adapter.CreateEvent(e.execId, "full", err, e.start, dur, false)
+
+	dur := UnixMilli(time.Now()) - UnixMilli(e.start)
+	msg := eventOK
 	if err != nil {
-		event.Message = "Errore nella sonda"
-	} else {
-		event.Message = "Esito sonda ok"
+		msg = eventNOK
 	}
-	e.logEvent(event)
+	e.createEvent(e.execId, err, "full", msg, e.start, dur, false)
+
 	if e.quit {
 		_ = e.adapter.Quit()
 	}
