@@ -40,12 +40,12 @@ func createVariables(variables string) (map[string]interface{}, error) {
 }
 
 func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, imgDump bool, capture string, variables string) error {
-	logType, logLevel := executor.RequiredLogs()
 	chromeCaps := chrome.Caps{}
 	for _, arg := range args {
 		chromeCaps.Args = append(chromeCaps.Args, arg /*"headless"*/)
 	}
 	caps := base.Capabilities{}
+	logType, logLevel := executor.RequiredLogs()
 	caps.SetLogLevel(logType, logLevel)
 	caps.SetChrome(chromeCaps)
 	driver := wd.NewWebDriver(nil, caps, wdUrl, false)
