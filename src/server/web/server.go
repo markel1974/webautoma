@@ -2,8 +2,8 @@ package web
 
 import (
 	"errors"
-	"markel/gm/pkg/server/asset"
-	"markel/gm/pkg/server/helpers"
+	"github.com/markel1974/webautoma/src/server/asset"
+	"github.com/markel1974/webautoma/src/server/helpers"
 	"net/http"
 	"path"
 	"strings"

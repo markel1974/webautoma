@@ -6,7 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/markel1974/webautoma/src/executor"
+	"github.com/markel1974/webautoma/src/server"
 	"github.com/markel1974/webautoma/src/server/asset"
+	"github.com/markel1974/webautoma/src/server/config"
+	"github.com/markel1974/webautoma/src/server/handlers/httphandler"
 	"github.com/markel1974/webautoma/src/service"
 	"github.com/markel1974/webautoma/src/version"
 	"github.com/markel1974/webautoma/src/wd"
@@ -21,6 +24,23 @@ import (
 //export GOPRIVATE=github.com/markel1974/webautoma
 //go mod tidy
 //go mod vendor
+
+func createServer(listen string) error {
+	cfg := &config.Config{
+		Listen: listen,
+	}
+	s := server.New()
+	h := httphandler.New()
+	if err := s.Setup(h, cfg); err != nil {
+		fmt.Println(err.Error())
+		return err
+	}
+	if err := s.Start(); err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
+}
 
 func createAsset(createAsset string) {
 	c := strings.Split(createAsset, ":")
@@ -110,6 +130,7 @@ func main() {
 	var driverArgs string
 	var buildAsset string
 	var imgDump bool
+	var listen string
 
 	//wd.Example3()
 
@@ -126,6 +147,7 @@ func main() {
 	flag.StringVar(&imgFile, "i", executor.DefaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
 	flag.StringVar(&buildAsset, "t", "", "create file asset (format package:name:dir)")
+	flag.StringVar(&listen, "y", "", "server listen")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
 	flag.BoolVar(&imgDump, "a", false, "image dump")
 
@@ -179,6 +201,14 @@ func main() {
 	if len(sideFile) == 0 {
 		fmt.Println("empty side file")
 		flag.Usage()
+		return
+	}
+
+	if len(listen) > 0 {
+		if err := createServer(listen); err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 		return
 	}
 
