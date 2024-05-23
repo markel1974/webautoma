@@ -1,6 +1,7 @@
 #!/bin/sh
 
 export NVM_DIR=$HOME/.nvm
+# shellcheck disable=SC2039
 source "${NVM_DIR}/nvm.sh"
 
 ROOT=$(pwd)
