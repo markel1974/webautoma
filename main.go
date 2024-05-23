@@ -198,17 +198,17 @@ func main() {
 		}
 	}
 
-	if len(sideFile) == 0 {
-		fmt.Println("empty side file")
-		flag.Usage()
-		return
-	}
-
 	if len(listen) > 0 {
 		if err := createServer(listen); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
+		return
+	}
+
+	if len(sideFile) == 0 {
+		fmt.Println("empty side file")
+		flag.Usage()
 		return
 	}
 
