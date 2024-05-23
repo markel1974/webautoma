@@ -1,21 +1,13 @@
-import React, {ReactNode} from "react";
+import React, { ReactNode } from "react";
 
 import {
     EuiPageTemplate,
 } from '@elastic/eui';
 
-//import { defaultRest } from './libraries/rest';
-//import { defaultStore } from './libraries/store';
-import { defaultCookies } from './libraries/cookies';
+//import { defaultCookies } from './libraries/cookies';
 import { bus, defaultEmitter } from './libraries/bus';
-//import { bus, busMessage, defaultEmitter } from './libraries/bus';
-//import { websocket } from './libraries/websocket';
-//import { mainIconApp, mainIconTitle, mainIconText, mainIconInitialize } from './libraries/icons';
-import { H2D } from "./components/H2D";
-import { Dimon } from "./components/Dimon";
-import { Toaster } from "./components/Toaster";
-//import { ThemesOptions } from "./components/ThemesHandler"
-//import { roundTwoDigits } from "./libraries/numbers";
+import { SideEditor } from "./components/sideeditor/sideeditor";
+
 
 interface Props {
     show?: boolean
@@ -30,11 +22,11 @@ export class App extends React.Component<Props, IComponentState> {
     private bus: bus;
     //private readonly version = "2.2.0"; //TODO FROM API
 
-    constructor (props: Props) {
+    constructor(props: Props) {
         super(props);
         this.bus = new bus(defaultEmitter().getId());
 
-        this.state =  {
+        this.state = {
             activeId: '',
             activeComponent: null
         }
@@ -54,16 +46,16 @@ export class App extends React.Component<Props, IComponentState> {
 
     private renderDimon() {
         return (
-            <Dimon session={defaultCookies().get("")}/>
+            <div></div>
         );
     }
 
-    render () {
+    render() {
         return (
-                <EuiPageTemplate>
-                    <Toaster/>
-                    { this.renderDimon() }
-                </EuiPageTemplate>
+            <EuiPageTemplate>
+                {/* <Toaster/> */}
+                <SideEditor editMode={true}/>
+            </EuiPageTemplate>
 
         )
     }

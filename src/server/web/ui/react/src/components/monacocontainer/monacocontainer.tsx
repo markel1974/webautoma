@@ -1,8 +1,7 @@
 import React from 'react';
 import MonacoEditor, { monaco } from 'react-monaco-editor';
 import {
-  EuiButtonIcon,
-  EuiResizeObserver,
+  EuiButtonIcon, EuiResizeObserver,
 } from '@elastic/eui';
 import { EuiButtonGroupOptionProps } from "@elastic/eui/src/components/button/button_group/button_group";
 

@@ -1,3 +1,5 @@
 # Created by .ignore support plugin (hsz.mobi)
 build/
 vendor/
+src/server/web/ui/react/node_modules
+src/server/web/ui/.cache-loader

@@ -1,7 +1,7 @@
 {
-  "name": "injector",
+  "name": "webautoma",
   "version": "1.0.0",
-  "description": "injector",
+  "description": "webautoma",
   "main": "main.tsx",
   "license": "MIT",
   "scripts": {
@@ -18,10 +18,6 @@
     "@elastic/eui": "^70.4.0",
     "@emotion/css": "^11.10.5",
     "@emotion/react": "^11.10.5",
-    "@googlemaps/react-wrapper": "^1.1.26",
-    "@types/google-map-react": "^2.1.5",
-    "google-map-react": "^2.1.10",
-    "leaflet": "^1.7.1",
     "moment": "^2.29.4",
     "moment-duration-format": "^2.3.2",
     "moment-timezone": "^0.5.34",
@@ -32,7 +28,6 @@
     "prop-types": "^15.8.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
-    "react-leaflet": "^3.2.5",
     "react-monaco-editor": "^0.51.0",
     "react-router-dom": "^6.2.1",
     "typescript": "^4.9.3"
@@ -42,7 +37,6 @@
     "@babel/preset-env": "^7.13.5",
     "@babel/preset-react": "^7.12.13",
     "@babel/preset-typescript": "^7.16.7",
-    "@types/leaflet": "^1.7.9",
     "@types/react": "^16.14.21",
     "@types/react-dom": "^16.9.14",
     "@types/react-router-dom": "^5.3.2",
