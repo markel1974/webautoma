@@ -54,15 +54,3 @@
 .minW-50{
     min-width: 50rem;
 }
-
-/*
-.leaflet-container {
-    width: 100wh;
-    height: 100vh;
-}
-*/
-
-.leaflet-container {
-    width: 100%;
-    height: 100%;
-}

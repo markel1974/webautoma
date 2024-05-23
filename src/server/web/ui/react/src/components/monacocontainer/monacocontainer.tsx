@@ -1,7 +1,8 @@
 import React from 'react';
 import MonacoEditor, { monaco } from 'react-monaco-editor';
 import {
-  EuiButtonIcon, EuiResizeObserver,
+  EuiButtonIcon,
+  EuiResizeObserver,
 } from '@elastic/eui';
 import { EuiButtonGroupOptionProps } from "@elastic/eui/src/components/button/button_group/button_group";
 
@@ -173,6 +174,7 @@ export class MonacoContainer extends React.Component<Props, IComponentState> {
     }
   }
 
+  /*
   renderEditor() {
     const language = this.props.language ? this.props.language : "javascript"
     return (
@@ -210,6 +212,45 @@ export class MonacoContainer extends React.Component<Props, IComponentState> {
             </div>
           </div>)}
       </EuiResizeObserver>
+    )
+  }
+  */
+
+
+  renderEditor() {
+    const language = this.props.language ? this.props.language : "javascript"
+    return (
+              <div id={this.getEditorKey()}
+                   style={{
+                     boxShadow: this.props.hasShadow ? this.boxShadow : 'none',
+                     borderTopLeftRadius: this.borderRadius.topLeft,
+                     borderTopRightRadius: this.borderRadius.topRight,
+                     borderBottomLeftRadius: this.borderRadius.bottomLeft,
+                     borderBottomRightRadius: this.borderRadius.bottomRight,
+                     position: 'relative', width: '100%', height: '100%', overflow: "hidden"
+                   }}>
+                <div style={{ position: 'absolute', width: '100%', height: '100%', overflow: "hidden" }}>
+                  <EuiButtonIcon aria-label={"fullscreen"} color="danger" iconType="fullScreen" size="s" iconSize="s" title="toggle fullscreen" onClick={() => { this.startFullScreen() }} style={{ zIndex: 1000, position: "absolute", top: 0, right: 0 }}></EuiButtonIcon>
+                  <MonacoEditor
+                      language={language}
+                      defaultValue={this.code}
+                      value={this.code}
+                      //theme="vs-dark"
+                      //theme="hc-black"
+                      //theme={_themeId}
+                      options={{
+                        selectOnLineNumbers: true,
+                        automaticLayout: true,
+                        quickSuggestions: true,
+                        quickSuggestionsDelay: 500,
+                        readOnly: !this.props.editMode,
+                        minimap: { enabled: true }
+                      }}
+                      onChange={(x: string | undefined) => this.onCodeChange(x)}
+                      editorDidMount={(editor: any, monacoT: any) => { this.editorDidMount(editor, monacoT) }}
+                  />
+                </div>
+              </div>
     )
   }
 
