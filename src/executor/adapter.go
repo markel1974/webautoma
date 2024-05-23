@@ -341,15 +341,19 @@ func (e *Adapter) SendKeys(by string, data string, value string) error {
 	if len(value) == 0 {
 		return nil
 	}
-	var err error
+	var err error = nil
+	var elm base.IWebElement = nil
 	pos := 0
 	start := UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
-		err = nil
-		elm, _ := e._findElementReady(by, data, 2)
-		if elm == nil {
-			err = fmt.Errorf("element isn't ready")
-		} else {
+		if elm == nil || err != nil {
+			if elm, _ = e._findElementReady(by, data, 2); elm == nil {
+				err = fmt.Errorf("element isn't ready")
+			} else {
+				err = nil
+			}
+		}
+		if elm != nil && err == nil {
 			err = elm.SendKeys(string(value[pos]))
 		}
 		e.HumanWait()
@@ -366,14 +370,19 @@ func (e *Adapter) SendKeys(by string, data string, value string) error {
 }
 
 func (e *Adapter) MouseActions(by string, data string, command string, value string) error {
-	var err error
+	var err error = nil
+	var elm base.IWebElement = nil
 	var start = UnixMilli(time.Now())
 	for UnixMilli(time.Now())-start < int64(e.wait) {
-		err = nil
-		elm, _ := e._findElementReady(by, data, 2)
-		if elm == nil {
-			err = fmt.Errorf("element isn't ready (%s:%s)", by, data)
-		} else {
+		if elm == nil || err != nil {
+			if elm, _ = e._findElementReady(by, data, 2); elm == nil {
+				err = fmt.Errorf("element isn't ready")
+			} else {
+				err = nil
+			}
+		}
+
+		if elm != nil && err == nil {
 			switch command {
 			case "click":
 				err = elm.Click()
@@ -403,6 +412,7 @@ func (e *Adapter) MouseActions(by string, data string, command string, value str
 				}
 			case "mouseMultipleMoveAt":
 				if e.drag != nil {
+					//TODO l'iterazione deve essere nel ciclo principale
 					baseCords := base.Point{X: 0, Y: 0}
 					for _, m := range strings.Split(value, "|") {
 						var coordsMultipleMoveAt = e.getCoords(m)
