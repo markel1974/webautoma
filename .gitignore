@@ -3,3 +3,4 @@ build/
 vendor/
 src/server/web/ui/react/node_modules
 src/server/web/ui/.cache-loader
+src/server/web/ui/react/yarn.lock
