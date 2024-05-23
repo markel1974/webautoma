@@ -1,9 +1,12 @@
 #!/bin/sh
 
+export NVM_DIR=$HOME/.nvm
+source "${NVM_DIR}/nvm.sh"
+
 ROOT=$(pwd)
 cd ./src/server/web/ui/react || exit
-pwd
-#nvm use
+nvm use
+
 yarn run build
 sed -i'.backup' 's/<!--PRODUCTION_BUILD-->/<script src="build.js"><\/script>/' ./dist/index.html
 cd "${ROOT}" || exit
