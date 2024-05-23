@@ -1,0 +1,14 @@
+nvm is a version manager for node.js
+https://github.com/nvm-sh/nvm
+
+nvm use
+
+
+fomantic-ui
+
+npm install -g gulp
+npm install fomantic-ui --save
+cp semantic.json in node_moules/fomantic-ui
+cd node_modules/fomantic-ui
+gulp install
+

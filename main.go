@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/markel1974/webautoma/src/executor"
+	"github.com/markel1974/webautoma/src/server/asset"
 	"github.com/markel1974/webautoma/src/service"
 	"github.com/markel1974/webautoma/src/version"
 	"github.com/markel1974/webautoma/src/wd"
@@ -20,6 +21,29 @@ import (
 //export GOPRIVATE=github.com/markel1974/webautoma
 //go mod tidy
 //go mod vendor
+
+func createAsset(createAsset string) {
+	c := strings.Split(createAsset, ":")
+	if len(c) < 3 {
+		fmt.Println("asset error: ", "wrong format (package:name:dir)")
+		return
+	}
+	packageAsset := c[0]
+	packageName := c[1]
+	packageDir := c[2]
+	fmt.Println("generating asset: ", packageName, packageAsset, packageDir, ".....")
+	w := asset.NewWriter()
+	if err := w.Setup(packageDir); err != nil {
+		fmt.Println("asset error: ", err.Error())
+		return
+	}
+	if err := w.Marshal(packageAsset, "AssetContent", packageName); err != nil {
+		fmt.Println("asset error: ", err.Error())
+		return
+	}
+	fmt.Println("asset generated successfully")
+	return
+}
 
 func createCapture(capture string) []string {
 	if len(capture) == 0 {
@@ -84,6 +108,7 @@ func main() {
 	var capture string
 	var variables string
 	var driverArgs string
+	var buildAsset string
 	var imgDump bool
 
 	//wd.Example3()
@@ -100,6 +125,7 @@ func main() {
 	flag.StringVar(&resultFile, "l", executor.DefaultResultFile, "result file")
 	flag.StringVar(&imgFile, "i", executor.DefaultImagesFile, "images file")
 	flag.StringVar(&capture, "c", "", "capture event data (comma separated values)")
+	flag.StringVar(&buildAsset, "t", "", "create file asset (format package:name:dir)")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
 	flag.BoolVar(&imgDump, "a", false, "image dump")
 
@@ -112,6 +138,11 @@ func main() {
 
 	if showVersion {
 		fmt.Println(version.AppName, version.AppVersion)
+		return
+	}
+
+	if len(buildAsset) > 0 {
+		createAsset(buildAsset)
 		return
 	}
 

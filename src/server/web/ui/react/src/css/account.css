@@ -1,0 +1,6 @@
+
+
+#modal_body_account_editor .euiModalBody__overflow {
+    overflow-y: hidden !important;
+    overflow-x: hidden !important;
+}
