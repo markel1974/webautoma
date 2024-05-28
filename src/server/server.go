@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 
@@ -102,7 +103,7 @@ func (fe *Server) getTLSConfig(host string, caCertFile string, certOpt tls.Clien
 func (fe *Server) Start() error {
 	var err error
 
-	//logger.Info(nil, "Starting Web API on %s", fe.cfg.Listen)
+	log.Printf("Starting Web on %s", fe.cfg.Listen)
 
 	if fe.cfg.TLS {
 		var tlsConfig *tls.Config
