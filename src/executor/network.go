@@ -26,22 +26,45 @@ type NetworkMessage struct {
 	} `json:"message"`
 }
 
+const rgxDef = "rgx:"
+
 type Network struct {
-	filter           *regexp.Regexp
-	capture          []string
-	acquired         map[string]interface{}
-	supportedMethods []string
+	filter              *regexp.Regexp
+	capture             []string
+	acquired            map[string]interface{}
+	supportedMethods    []string
+	supportedMethodsRgx []*regexp.Regexp
 }
 
-func NewNetwork(capture []string, supportedMethods []string) *Network {
-	if supportedMethods == nil {
+func NewNetwork(capture []string, sm []string) (*Network, error) {
+	var supportedMethods []string
+	var supportedMethodsRgx []*regexp.Regexp
+
+	if sm != nil {
+		for _, m := range sm {
+			if strings.HasPrefix(m, rgxDef) {
+				m = m[len(rgxDef):]
+				r, err := regexp.Compile(m)
+				if err != nil {
+					return nil, err
+				}
+				supportedMethodsRgx = append(supportedMethodsRgx, r)
+			} else {
+				supportedMethods = append(supportedMethods, m)
+			}
+		}
+	}
+
+	if len(supportedMethods) == 0 && len(supportedMethodsRgx) == 0 {
 		supportedMethods = _supportedMethod
 	}
+
 	return &Network{
-		filter:           regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
-		capture:          capture,
-		supportedMethods: supportedMethods,
-	}
+		filter:              regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
+		capture:             capture,
+		supportedMethods:    supportedMethods,
+		supportedMethodsRgx: supportedMethodsRgx,
+	}, nil
 }
 
 func (n *Network) Acquired() map[string]interface{} {
@@ -66,6 +89,15 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 				break
 			}
 		}
+		if !hasMethodSupport {
+			for _, v := range n.supportedMethodsRgx {
+				if v.MatchString(network.Message.Method) {
+					hasMethodSupport = true
+					break
+				}
+			}
+		}
+
 		if !hasMethodSupport {
 			continue
 		}

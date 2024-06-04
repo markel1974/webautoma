@@ -86,7 +86,11 @@ func (e *Adapter) Setup(logFile string, imgFile string, imgDump bool, profileCap
 	if imgDump {
 		e.imgDump = 1
 	}
-	e.network = NewNetwork(profileCapture, profileSupportedMethod)
+	var err error
+	e.network, err = NewNetwork(profileCapture, profileSupportedMethod)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
