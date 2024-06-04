@@ -1,6 +1,9 @@
 package executor
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Event struct {
 	ProbeId           string                 `json:"probeId"`
@@ -22,22 +25,23 @@ type Event struct {
 	Target            string                 `json:"target,omitempty"`
 	Command           string                 `json:"command,omitempty"`
 	Message           string                 `json:"message,omitempty"`
+
+	adapter *Adapter
 }
 
-func NewEvent(id string, kind string, err error, start time.Time, dur int64) *Event {
-	stop := time.Now()
+func NewEvent(adapter *Adapter, id string, kind string, err error, start time.Time) *Event {
 	errorDesc := ""
 	if err != nil {
 		errorDesc = err.Error()
 	}
 	event := &Event{
+		adapter:           adapter,
 		ProbeId:           "",
 		ThreadName:        id,
 		TransactionType:   kind,
 		Timestamp:         time.Now().Format(RFC3339Milli),
 		Start:             start.Format(RFC3339Milli),
-		Stop:              stop.Format(RFC3339Milli),
-		ExecutionTime:     dur,
+		ExecutionTime:     0,
 		UUID:              "",
 		Level:             "INFO",
 		Error:             errorDesc,
@@ -51,4 +55,16 @@ func NewEvent(id string, kind string, err error, start time.Time, dur int64) *Ev
 		Message:           "",
 	}
 	return event
+}
+
+func (e *Event) Write(message string, dur int64) {
+	e.Message = message
+	e.ExecutionTime = dur
+	e.Stop = time.Now().Format(RFC3339Milli)
+	body, err := json.Marshal(e)
+	if err != nil {
+		e.adapter.log(LogLevelCritical, err.Error())
+		return
+	}
+	e.adapter.WriteLog(string(body))
 }

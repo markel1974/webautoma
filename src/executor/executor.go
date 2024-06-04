@@ -16,8 +16,14 @@ func RequiredLogs() (base.LogType, base.LogLevel) {
 }
 
 const (
-	eventOK  = "Esito sonda ok"
-	eventNOK = "Errore nella sonda"
+	eventMessageOK                = "Esito sonda ok"
+	eventMessageNOK               = "Errore nella sonda"
+	eventMessageTimerNotFinalized = "timer not finalized"
+)
+
+const (
+	eventKindFull         = "full"
+	eventKindIntermediate = "intermediate"
 )
 
 type Executor struct {
@@ -107,19 +113,6 @@ func (e *Executor) doScreenshot(screenshotId string) error {
 	return e.adapter.Screenshot(screenshotId)
 }
 
-func (e *Executor) doWriteLog(message string) {
-	e.adapter.WriteLog(message)
-}
-
-func (e *Executor) logEvent(event *Event) {
-	message, err := json.Marshal(event)
-	if err != nil {
-		e.adapter.log(LogLevelCritical, err.Error())
-		return
-	}
-	e.doWriteLog(string(message))
-}
-
 func (e *Executor) computeSelector(target string) (string, string, error) {
 	var container = strings.Split(target, "=")
 	if len(container) <= 1 {
@@ -147,12 +140,6 @@ func (e *Executor) computeSelector(target string) (string, string, error) {
 	return by, data, nil
 }
 
-func (e *Executor) createEvent(id string, err error, kind string, message string, start time.Time, dur int64, shot bool) {
-	event := e.adapter.CreateEvent(id, kind, err, start, dur, shot)
-	event.Message = message
-	e.logEvent(event)
-}
-
 func (e *Executor) doTimer(target string, until string, value string) error {
 	switch until {
 	case "timerCreate":
@@ -166,18 +153,20 @@ func (e *Executor) doTimer(target string, until string, value string) error {
 		return fmt.Errorf("unknown timer id (timerStart): %s", target)
 	case "timerStop":
 		if t, ok := e.timers[target]; ok {
-			t.Stop()
 			if strings.TrimSpace(strings.ToLower(value)) == "finalize" {
-				dur := t.Finalize()
-				e.createEvent(t.Id, nil, "full", eventOK, t.Start, dur, false)
+				event := e.adapter.CreateEvent(t.Id, nil, eventKindFull, t.Start, false)
+				t.Stop()
+				event.Write(eventMessageOK, t.Finalize())
+			} else {
+				t.Stop()
 			}
 			return nil
 		}
 		return fmt.Errorf("unknown timer id (timerStop): %s", target)
 	case "timerFinalize":
 		if t, ok := e.timers[target]; ok {
-			dur := t.Finalize()
-			e.createEvent(t.Id, nil, "full", eventOK, t.Start, dur, false)
+			event := e.adapter.CreateEvent(t.Id, nil, eventKindFull, t.Start, false)
+			event.Write(eventMessageOK, t.Finalize())
 			return nil
 		}
 		return fmt.Errorf("unknown timer id (timerFinalize): %s", target)
@@ -658,9 +647,19 @@ func (e *Executor) doNavigate(target string) error {
 	return e.adapter.Navigate(target)
 }
 
-func (e *Executor) commandExec(id string, command string, target string, until string, value string) error {
-	var err error
+func (e *Executor) commandExec(cmd ConfigCommand) error {
 	start := time.Now()
+	var err error
+	id := cmd.Id
+	command := cmd.Command
+	target := cmd.Target
+	until := cmd.Until
+	value := cmd.Value
+	windowTimeout := 0
+
+	if len(cmd.WindowHandleName) > 0 {
+		windowTimeout = e.adapter.AddWindowHandle(cmd)
+	}
 
 	e.adapter.HumanWait()
 
@@ -754,30 +753,37 @@ func (e *Executor) commandExec(id string, command string, target string, until s
 	case "noop":
 		//nothing to do
 	default:
-		e.adapter.log(LogLevelWarning, "unimplemented command: "+command)
+		err = fmt.Errorf("unimplemented command: %s", command)
+		//e.adapter.log(LogLevelWarning, "unimplemented command: "+command)
 	}
-	event := e.adapter.CreateEvent(e.execId, "intermediate", err, start, UnixMilli(time.Now())-UnixMilli(start), true)
+
+	if err == nil {
+		if windowTimeout > 0 {
+			e.adapter.Sleep(windowTimeout)
+		}
+	}
+
+	event := e.adapter.CreateEvent(e.execId, err, eventKindIntermediate, start, true)
 	event.Label = id
 	event.Target = target
 	event.Command = command
-	e.logEvent(event)
+	event.Write("", UnixMilli(time.Now())-UnixMilli(start))
 	return err
 }
 
 func (e *Executor) finalize(err error) {
 	for _, t := range e.timers {
 		if !t.Finalized {
-			dur := t.Finalize()
-			e.createEvent(t.Id, err, "full", "timer not finalized", t.Start, dur, false)
+			event := e.adapter.CreateEvent(t.Id, err, eventKindFull, t.Start, false)
+			event.Write(eventMessageTimerNotFinalized, t.Finalize())
 		}
 	}
-
-	dur := UnixMilli(time.Now()) - UnixMilli(e.start)
-	msg := eventOK
+	msg := eventMessageOK
 	if err != nil {
-		msg = eventNOK
+		msg = eventMessageNOK
 	}
-	e.createEvent(e.execId, err, "full", msg, e.start, dur, false)
+	event := e.adapter.CreateEvent(e.execId, err, eventKindFull, e.start, false)
+	event.Write(msg, UnixMilli(time.Now())-UnixMilli(e.start))
 
 	if e.quit {
 		_ = e.adapter.Quit()
@@ -810,10 +816,6 @@ func (e *Executor) commandsLoop() (string, error) {
 					x = jump
 				}
 			} else {
-				windowTimeout := 0
-				if err == nil && len(cmd.WindowHandleName) > 0 {
-					windowTimeout = e.adapter.AddWindowHandle(cmd)
-				}
 				if e.lastFrame != nil {
 					/*
 						//if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
@@ -827,10 +829,7 @@ func (e *Executor) commandsLoop() (string, error) {
 						}
 					*/
 				}
-				err = e.commandExec(cmd.Id, cmd.Command, cmd.Target, cmd.Until, cmd.Value)
-				if windowTimeout > 0 {
-					e.adapter.Sleep(windowTimeout)
-				}
+				err = e.commandExec(cmd)
 			}
 			if e.adapter.IsErrorDisabled() {
 				err = nil

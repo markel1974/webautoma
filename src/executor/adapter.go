@@ -507,11 +507,11 @@ func (e *Adapter) Sleep(interval int) {
 	time.Sleep(time.Millisecond * time.Duration(interval))
 }
 
-func (e *Adapter) CreateEvent(id string, kind string, err error, start time.Time, dur int64, shot bool) *Event {
+func (e *Adapter) CreateEvent(id string, err error, kind string, start time.Time, shot bool) *Event {
 	if e.errorDisabled {
 		err = nil
 	}
-	event := NewEvent(id, kind, err, start, dur)
+	event := NewEvent(e, id, kind, err, start)
 	event.ProbeId = e.probeId
 	event.UUID = e.uuid
 	logEntries, logErr := e.driver.Log(base.LogPerformance) //e.Log(base.LogPerformance)
@@ -524,8 +524,8 @@ func (e *Adapter) CreateEvent(id string, kind string, err error, start time.Time
 	}
 	if shot && err != nil {
 		event.ScreenShoot = "probes-" + uuid.New().String()
-		if err := e.Screenshot(event.ScreenShoot); err != nil {
-			e.log(LogLevelCritical, "error generating screenshot: "+err.Error())
+		if screenErr := e.Screenshot(event.ScreenShoot); screenErr != nil {
+			e.log(LogLevelCritical, "error generating screenshot: "+screenErr.Error())
 		}
 	}
 	return event

@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+var _supportedMethod = []string{"Network.responseReceived"}
+
+var _supportedContentType = []string{"text/html", "json", "xml"}
+
 type NetworkMessage struct {
 	Message struct {
 		Method string `json:"method"`
@@ -49,37 +53,54 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 			log.Println(err.Error())
 			continue
 		}
-		if network.Message.Method != "Network.responseReceived" {
+
+		hasMethodSupport := false
+		for _, v := range _supportedMethod {
+			if v == network.Message.Method {
+				hasMethodSupport = true
+				break
+			}
+		}
+		if !hasMethodSupport {
 			continue
 		}
+
 		currentURL := network.Message.Params.Response.URL
 		if n.filter.MatchString(currentURL) {
 			currentHeaders := network.Message.Params.Response.Headers
 			contentType, _ := MapToString(currentHeaders, "content-type")
-			if strings.Contains(contentType, "text/html") || strings.Contains(contentType, "json") || strings.Contains(contentType, "xml") {
-				//currenTiming := network.Message.Params.Response.Timing
-				currentStatus := network.Message.Params.Response.Status
-				for _, capture := range n.capture {
-					if res, ok := MapToString(currentHeaders, capture); ok {
-						if n.acquired == nil {
-							n.acquired = make(map[string]interface{})
-						}
-						n.acquired[capture] = res
+			hasContentSupport := false
+			for _, v := range _supportedContentType {
+				if strings.Contains(contentType, v) {
+					hasContentSupport = true
+					break
+				}
+			}
+			if !hasContentSupport {
+				continue
+			}
+			currentStatus := network.Message.Params.Response.Status
+			for _, capture := range n.capture {
+				if res, ok := MapToString(currentHeaders, capture); ok {
+					if n.acquired == nil {
+						n.acquired = make(map[string]interface{})
 					}
+					n.acquired[capture] = res
 				}
-				if currentStatus >= 400 {
-					errorCount++
-				}
-				if headersData == nil {
-					headersData = make(map[string]interface{})
-				}
-				headersData[currentURL] = map[string]interface{}{
-					"url":     currentURL,
-					"headers": currentHeaders,
-					//"timing":       currenTiming,
-					"content-type": contentType,
-					"status":       currentStatus,
-				}
+			}
+			if currentStatus >= 400 {
+				errorCount++
+			}
+			if headersData == nil {
+				headersData = make(map[string]interface{})
+			}
+			headersData[currentURL] = map[string]interface{}{
+				"url":     currentURL,
+				"headers": currentHeaders,
+				//"timing":       currenTiming,
+				"content-type":  contentType,
+				"status":        currentStatus,
+				"messageMethod": network.Message.Method,
 			}
 		}
 	}
