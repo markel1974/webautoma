@@ -76,7 +76,7 @@ func NewAdapter(driver base.IWebDriver) *Adapter {
 	}
 }
 
-func (e *Adapter) Setup(logFile string, imgFile string, imgDump bool, capture []string) error {
+func (e *Adapter) Setup(logFile string, imgFile string, imgDump bool, profileCapture []string, profileSupportedMethod []string) error {
 	if len(logFile) > 0 {
 		e.logFile = logFile
 	}
@@ -86,7 +86,7 @@ func (e *Adapter) Setup(logFile string, imgFile string, imgDump bool, capture []
 	if imgDump {
 		e.imgDump = 1
 	}
-	e.network = NewNetwork(capture)
+	e.network = NewNetwork(profileCapture, profileSupportedMethod)
 	return nil
 }
 

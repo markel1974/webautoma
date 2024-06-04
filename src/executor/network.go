@@ -27,15 +27,20 @@ type NetworkMessage struct {
 }
 
 type Network struct {
-	filter   *regexp.Regexp
-	capture  []string
-	acquired map[string]interface{}
+	filter           *regexp.Regexp
+	capture          []string
+	acquired         map[string]interface{}
+	supportedMethods []string
 }
 
-func NewNetwork(capture []string) *Network {
+func NewNetwork(capture []string, supportedMethods []string) *Network {
+	if supportedMethods == nil {
+		supportedMethods = _supportedMethod
+	}
 	return &Network{
-		filter:  regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
-		capture: capture,
+		filter:           regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
+		capture:          capture,
+		supportedMethods: supportedMethods,
 	}
 }
 
@@ -55,7 +60,7 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 		}
 
 		hasMethodSupport := false
-		for _, v := range _supportedMethod {
+		for _, v := range n.supportedMethods {
 			if v == network.Message.Method {
 				hasMethodSupport = true
 				break
@@ -79,7 +84,7 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 			if !hasContentSupport {
 				continue
 			}
-			currentStatus := network.Message.Params.Response.Status
+
 			for _, capture := range n.capture {
 				if res, ok := MapToString(currentHeaders, capture); ok {
 					if n.acquired == nil {
@@ -88,6 +93,8 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 					n.acquired[capture] = res
 				}
 			}
+
+			currentStatus := network.Message.Params.Response.Status
 			if currentStatus >= 400 {
 				errorCount++
 			}

@@ -56,7 +56,7 @@ func New(driver base.IWebDriver) *Executor {
 	return e
 }
 
-func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDump bool, capture []string, variables map[string]interface{}) error {
+func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDump bool, profileCapture []string, variables map[string]interface{}) error {
 	var err error
 	e.execId = computeFileId(sideFile)
 	e.templates = NewTemplates(variables)
@@ -69,15 +69,16 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	if e.cfgFile, err = e.templates.Apply(sideFile, nil); err != nil {
 		return err
 	}
-	if err = e.adapter.Setup(logFile, imgFile, imgDump, capture); err != nil {
-		return err
-	}
 	var fileData []byte
 	if fileData, err = os.ReadFile(e.cfgFile); err != nil {
 		return err
 	}
 	if err = json.Unmarshal(fileData, &e.cfg); err != nil {
 		return err
+	}
+
+	if e.cfg.ProfileCapture != nil {
+		profileCapture = e.cfg.ProfileCapture
 	}
 	if e.cfg.Quit != nil {
 		e.quit = *e.cfg.Quit
@@ -93,6 +94,9 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	}
 	if e.cfg.MaxScreenshotLength != nil {
 		e.adapter.SetMaxScreenshotLength(*e.cfg.MaxScreenshotLength)
+	}
+	if err = e.adapter.Setup(logFile, imgFile, imgDump, profileCapture, e.cfg.ProfileSupportedMethods); err != nil {
+		return err
 	}
 	return nil
 }
