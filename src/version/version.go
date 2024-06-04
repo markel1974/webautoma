@@ -1,8 +1,8 @@
 package version
 
 const MajorVersion = "1"
-const MinorVersion = "6"
-const PatchVersion = "3"
+const MinorVersion = "7"
+const PatchVersion = "4"
 const AppVersionShort = MajorVersion + "." + MinorVersion + "." + PatchVersion + "." + BuildVersion
 const AppVersion = MajorVersion + "." + MinorVersion + "." + PatchVersion + "." + BuildVersion + " [" + BuildDate + "]"
 const AppName = "webautoma"
