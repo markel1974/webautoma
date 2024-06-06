@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var _supportedMethod = []string{"Network.responseReceived"}
+var _supportedMethod = map[string]int{"Network.requestWillBeSent": 0, "Network.responseReceived": 1}
 
 var _supportedContentType = []string{"text/html", "json", "xml"}
 
@@ -16,6 +16,10 @@ type NetworkMessage struct {
 	Message struct {
 		Method string `json:"method"`
 		Params struct {
+			Request struct {
+				Headers map[string]interface{} `json:"headers"`
+				URL     string                 `json:"url"`
+			} `json:"request"`
 			Response struct {
 				Headers map[string]interface{} `json:"headers"`
 				Timing  map[string]interface{} `json:"timing"`
@@ -29,41 +33,45 @@ type NetworkMessage struct {
 const rgxDef = "rgx:"
 
 type Network struct {
-	filter              *regexp.Regexp
-	capture             []string
-	acquired            map[string]interface{}
-	supportedMethods    []string
-	supportedMethodsRgx []*regexp.Regexp
+	filter           *regexp.Regexp
+	capture          []string
+	acquired         map[string]interface{}
+	supportedMethods map[string]int
+	//supportedMethods    []string
+	//supportedMethodsRgx []*regexp.Regexp
 }
 
 func NewNetwork(capture []string, sm []string) (*Network, error) {
-	var supportedMethods []string
-	var supportedMethodsRgx []*regexp.Regexp
+	/*
+		var supportedMethods []string
+		var supportedMethodsRgx []*regexp.Regexp
 
-	if sm != nil {
-		for _, m := range sm {
-			if strings.HasPrefix(m, rgxDef) {
-				m = m[len(rgxDef):]
-				r, err := regexp.Compile(m)
-				if err != nil {
-					return nil, err
+		if sm != nil {
+			for _, m := range sm {
+				if strings.HasPrefix(m, rgxDef) {
+					m = m[len(rgxDef):]
+					r, err := regexp.Compile(m)
+					if err != nil {
+						return nil, err
+					}
+					supportedMethodsRgx = append(supportedMethodsRgx, r)
+				} else {
+					supportedMethods = append(supportedMethods, m)
 				}
-				supportedMethodsRgx = append(supportedMethodsRgx, r)
-			} else {
-				supportedMethods = append(supportedMethods, m)
 			}
 		}
-	}
 
-	if len(supportedMethods) == 0 && len(supportedMethodsRgx) == 0 {
-		supportedMethods = _supportedMethod
-	}
+		if len(supportedMethods) == 0 && len(supportedMethodsRgx) == 0 {
+			supportedMethods = _supportedMethod
+		}
+	*/
+	supportedMethods := _supportedMethod
 
 	return &Network{
-		filter:              regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
-		capture:             capture,
-		supportedMethods:    supportedMethods,
-		supportedMethodsRgx: supportedMethodsRgx,
+		filter:           regexp.MustCompile("(http|file|ftp|png|jpg|gif|js|css|mp4|ico|bmp)"),
+		capture:          capture,
+		supportedMethods: supportedMethods,
+		//supportedMethodsRgx: supportedMethodsRgx,
 	}, nil
 }
 
@@ -81,42 +89,39 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 			log.Println(err.Error())
 			continue
 		}
-
-		hasMethodSupport := false
-		for _, v := range n.supportedMethods {
-			if v == network.Message.Method {
-				hasMethodSupport = true
-				break
-			}
-		}
-		if !hasMethodSupport {
-			for _, v := range n.supportedMethodsRgx {
-				if v.MatchString(network.Message.Method) {
-					hasMethodSupport = true
-					break
-				}
-			}
+		hasMethodSupport := -1
+		if v, ok := _supportedMethod[network.Message.Method]; ok {
+			hasMethodSupport = v
 		}
 
-		if !hasMethodSupport {
+		var currentURL string
+		var currentStatus int
+		var currentHeaders map[string]interface{}
+		var contentType string
+
+		if hasMethodSupport == 0 {
+			currentURL, currentStatus, currentHeaders, contentType = n.getRequestParams(network)
+		} else if hasMethodSupport == 1 {
+			currentURL, currentStatus, currentHeaders, contentType = n.getResponseParams(network)
+		} else {
 			continue
 		}
 
-		currentURL := network.Message.Params.Response.URL
 		if n.filter.MatchString(currentURL) {
-			currentHeaders := network.Message.Params.Response.Headers
-			contentType, _ := MapToString(currentHeaders, "content-type")
 			hasContentSupport := false
-			for _, v := range _supportedContentType {
-				if strings.Contains(contentType, v) {
-					hasContentSupport = true
-					break
+			if len(contentType) == 0 {
+				hasContentSupport = true
+			} else {
+				for _, v := range _supportedContentType {
+					if strings.Contains(contentType, v) {
+						hasContentSupport = true
+						break
+					}
 				}
 			}
 			if !hasContentSupport {
 				continue
 			}
-
 			for _, capture := range n.capture {
 				if res, ok := MapToString(currentHeaders, capture); ok {
 					if n.acquired == nil {
@@ -125,8 +130,6 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 					n.acquired[capture] = res
 				}
 			}
-
-			currentStatus := network.Message.Params.Response.Status
 			if currentStatus >= 400 {
 				errorCount++
 			}
@@ -148,4 +151,20 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 		"result":     headersData,
 	}
 	return network, errorCount
+}
+
+func (n *Network) getRequestParams(nm NetworkMessage) (string, int, map[string]interface{}, string) {
+	currentURL := nm.Message.Params.Request.URL
+	currentHeaders := nm.Message.Params.Request.Headers
+	currentStatus := 0
+	contentType := ""
+	return currentURL, currentStatus, currentHeaders, contentType
+}
+
+func (n *Network) getResponseParams(nm NetworkMessage) (string, int, map[string]interface{}, string) {
+	currentURL := nm.Message.Params.Response.URL
+	currentHeaders := nm.Message.Params.Response.Headers
+	currentStatus := nm.Message.Params.Response.Status
+	contentType, _ := MapToString(currentHeaders, "content-type")
+	return currentURL, currentStatus, currentHeaders, contentType
 }
