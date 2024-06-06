@@ -7,6 +7,11 @@ type ConfigCommand struct {
 	Until   string `json:"until"`
 	Value   string `json:"value"`
 
+	X       float64 `json:"x"`
+	Y       float64 `json:"y"`
+	OffsetX float64 `json:"offsetX"`
+	OffsetY float64 `json:"offsetY"`
+
 	WindowHandleName string `json:"windowHandleName"`
 	WindowTimeout    int    `json:"windowTimeout"`
 	OpensWindow      bool   `json:"opensWindow"`
@@ -26,4 +31,5 @@ type Config struct {
 	ProfileCapture          []string     `json:"profileCapture"`
 	ProfileSupportedMethods []string     `json:"profileSupportedMethods"`
 	Tests                   []ConfigTest `json:"tests"`
+	Debug                   bool         `json:"debug"`
 }

@@ -95,6 +95,9 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	if e.cfg.MaxScreenshotLength != nil {
 		e.adapter.SetMaxScreenshotLength(*e.cfg.MaxScreenshotLength)
 	}
+	if e.cfg.Debug {
+		e.adapter.EnableDebug(true)
+	}
 	if err = e.adapter.Setup(logFile, imgFile, imgDump, profileCapture, e.cfg.ProfileSupportedMethods); err != nil {
 		return err
 	}
@@ -115,6 +118,27 @@ func (e *Executor) loadUrl(url string) error {
 
 func (e *Executor) doScreenshot(screenshotId string) error {
 	return e.adapter.Screenshot(screenshotId)
+}
+
+func (e *Executor) computeScroll(value string) (int, []string, int) {
+	var coords []string
+	step := 0
+	interval := 0
+	if strings.Contains(value, ",") {
+		container := strings.Split(value, ",")
+		if len(container) > 0 {
+			coords = strings.Split(container[0], "x")
+		}
+		if len(container) > 1 {
+			step, _ = strconv.Atoi(container[1])
+		}
+		if len(container) > 2 {
+			interval, _ = strconv.Atoi(container[2])
+		}
+	} else {
+		coords = strings.Split(value, "x")
+	}
+	return step, coords, interval
 }
 
 func (e *Executor) computeSelector(target string) (string, string, error) {
@@ -531,6 +555,13 @@ func (e *Executor) doDeleteCookie(target string) error {
 }
 
 func (e *Executor) doActionsSendKeys(value string) error {
+	//TODO TEST
+	//for x := 0; x < 100; x++ {
+	//	fmt.Println("SENDING KEYDOWN TEST")
+	//	e.adapter.KeyDown(base.DownArrowKey)
+	//	time.Sleep(100 * time.Millisecond)
+	//}
+
 	return e.adapter.KeyDown(value)
 }
 
@@ -583,24 +614,66 @@ func (e *Executor) doSetWindowSize(target string) error {
 	return e.adapter.ResizeWindow("", width, height)
 }
 
-func (e *Executor) doScrollTo(target string, value string) error {
-	var coords []string
-	step := 0
-	interval := 0
-	if strings.Contains(value, ",") {
-		container := strings.Split(value, ",")
-		if len(container) > 0 {
-			coords = strings.Split(container[0], "x")
-		}
-		if len(container) > 1 {
-			step, _ = strconv.Atoi(container[1])
-		}
-		if len(container) > 2 {
-			interval, _ = strconv.Atoi(container[2])
-		}
-	} else {
-		coords = strings.Split(value, "x")
+func (e *Executor) doScroll(cmd ConfigCommand) error {
+	value := cmd.Value
+	target := cmd.Target
+	step, coords, interval := e.computeScroll(value)
+	if len(coords) < 2 {
+		return fmt.Errorf("invalid value")
 	}
+	x := cmd.X
+	y := cmd.Y
+	var elm base.IWebElement
+	if len(target) > 0 {
+		by, data, err := e.computeSelector(target)
+		if err != nil {
+			return err
+		}
+		if elm = e.adapter.FindElementReady(by, data, 2); elm == nil {
+			return fmt.Errorf("element isn't ready")
+		}
+		p, err := elm.Location()
+		if err != nil {
+			return err
+		}
+		x = p.X
+		y = p.Y
+		//TODO COMPLETARE
+		//y += 50
+		//x = 1050
+		//y = 50
+	}
+
+	x += cmd.OffsetX
+	y += cmd.OffsetY
+
+	dx, _ := strconv.Atoi(coords[0])
+	dy, _ := strconv.Atoi(coords[1])
+	if step == 0 {
+		return e.adapter.Scroll(int(x), int(y), dx, dy)
+	}
+	deltaX := dx / step
+	deltaY := dy / step
+	currentX := 0
+	currentY := 0
+	for k := 0; k <= step; k++ {
+		if err := e.adapter.Scroll(int(x), int(y), currentX, currentY); err != nil {
+			return err
+		}
+		currentX += deltaX
+		currentY += deltaY
+		if interval > 0 {
+			e.adapter.Sleep(interval)
+		}
+	}
+	return nil
+
+}
+
+func (e *Executor) doScrollTo(cmd ConfigCommand) error {
+	value := cmd.Value
+	target := cmd.Target
+	step, coords, interval := e.computeScroll(value)
 	if len(coords) < 2 {
 		return fmt.Errorf("invalid value")
 	}
@@ -624,6 +697,9 @@ func (e *Executor) doScrollTo(target string, value string) error {
 	}
 	x, _ := strconv.Atoi(coords[0])
 	y, _ := strconv.Atoi(coords[1])
+	x += int(cmd.OffsetX)
+	y += int(cmd.OffsetY)
+
 	if step == 0 {
 		return elm.ScrollTo(x, y)
 	}
@@ -753,7 +829,9 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "pause":
 		err = e.doPause(target)
 	case "scrollTo":
-		err = e.doScrollTo(target, value)
+		err = e.doScrollTo(cmd)
+	case "scroll":
+		err = e.doScroll(cmd)
 	case "noop":
 		//nothing to do
 	default:
@@ -810,6 +888,10 @@ func (e *Executor) commandsLoop() (string, error) {
 	for _, test := range e.cfg.Tests {
 		for x := 0; x < len(test.Commands); x++ {
 			cmd := test.Commands[x]
+			if e.adapter.IsDebugEnabled() {
+				fmt.Printf("--------------------------------------------------------------\n")
+				fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
+			}
 			err := e.templates.BuildCommand(cmd, e.stack)
 			if err != nil {
 				return cmd.Id, err
@@ -835,6 +917,10 @@ func (e *Executor) commandsLoop() (string, error) {
 				}
 				err = e.commandExec(cmd)
 			}
+			if e.adapter.IsDebugEnabled() {
+				fmt.Printf("Error: %v\n", err)
+			}
+
 			if e.adapter.IsErrorDisabled() {
 				err = nil
 			}

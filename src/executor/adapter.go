@@ -151,6 +151,10 @@ func (e *Adapter) EnableDebug(d bool) {
 	e.debug = d
 }
 
+func (e *Adapter) IsDebugEnabled() bool {
+	return e.debug
+}
+
 func (e *Adapter) SetMaxScreenshotLength(len int) {
 	e.maxScreenshotLength = len
 }
@@ -649,4 +653,12 @@ func (e *Adapter) testerElement(wait int, fn func() (base.IWebElement, error)) (
 		e.RetryWait()
 	}
 	return nil, err
+}
+
+func (e *Adapter) Scroll(x int, y int, deltaX int, deltaY int) error {
+	e.driver.StoreWheelActions("wheel1", base.CreateWheelAction(x, y, deltaX, deltaY))
+	if err := e.driver.PerformActions(); err != nil {
+		return err
+	}
+	return nil
 }

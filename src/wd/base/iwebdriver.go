@@ -151,6 +151,13 @@ type IWebDriver interface {
 	// and used to refer to this specific device in future calls.
 	StorePointerActions(inputID string, pointer PointerType, actions ...PointerAction)
 
+	// StoreWheelActions store provided actions until they are executed
+	// by PerformActions or released by ReleaseActions.
+	// inputID is a string used as a unique virtual device identifier for this
+	// and future actions, the value can be set to any valid string
+	// and used to refer to this specific device in future calls.
+	StoreWheelActions(inputID string, actions ...WheelAction)
+
 	// PerformActions executes actions previously stored by calls to StorePointerActions and StoreKeyActions.
 	PerformActions() error
 
