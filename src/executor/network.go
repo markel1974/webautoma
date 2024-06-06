@@ -148,7 +148,8 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 	}
 	network := map[string]interface{}{
 		"errorCount": errorCount,
-		"result":     headersData,
+		//TODO le url non possono stare tra le chiavi....
+		//"result":     headersData,
 	}
 	return network, errorCount
 }
