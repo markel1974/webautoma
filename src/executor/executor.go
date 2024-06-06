@@ -339,7 +339,8 @@ func (e *Executor) doCloseWindow() error {
 	return nil
 }
 
-func (e *Executor) doClose(target string) error {
+func (e *Executor) doClose(cmd ConfigCommand) error {
+	target := cmd.Target
 	handle, err := e.adapter.GetWindowHandle(target)
 	if err != nil {
 		return err
@@ -423,7 +424,9 @@ func (e *Executor) doExists(target string, u string) error {
 	return nil
 }
 
-func (e *Executor) doUntil(target string, u string) error {
+func (e *Executor) doUntil(cmd ConfigCommand) error {
+	target := cmd.Target
+	u := cmd.Until
 	until := 0
 	if len(u) > 0 {
 		until = 1
@@ -449,7 +452,8 @@ func (e *Executor) doSelectWindow(target string) error {
 	return nil
 }
 
-func (e *Executor) doStoreWindowHandle(target string) error {
+func (e *Executor) doStoreWindowHandle(cmd ConfigCommand) error {
+	target := cmd.Target
 	return e.adapter.StoreWindowHandle(target)
 }
 
@@ -504,7 +508,8 @@ func (e *Executor) doWindowHandles(id string) error {
 	return nil
 }
 
-func (e *Executor) doPause(target string) error {
+func (e *Executor) doPause(cmd ConfigCommand) error {
+	target := cmd.Target
 	v, err := strconv.Atoi(target)
 	if err != nil {
 		return err
@@ -525,7 +530,8 @@ func (e *Executor) doPageSource(id string) error {
 	return nil
 }
 
-func (e *Executor) doStatus(id string) error {
+func (e *Executor) doStatus(cmd ConfigCommand) error {
+	id := cmd.Id
 	fmt.Printf("%s Status =>\n", id)
 	k, _ := e.adapter.Status()
 	fmt.Println(k)
@@ -594,12 +600,14 @@ func (e *Executor) doEnableError() error {
 	return nil
 }
 
-func (e *Executor) doExecId(target string) error {
+func (e *Executor) doExecId(cmd ConfigCommand) error {
+	target := cmd.Target
 	e.execId = target
 	return nil
 }
 
-func (e *Executor) doProbeId(target string) error {
+func (e *Executor) doProbeId(cmd ConfigCommand) error {
+	target := cmd.Target
 	e.adapter.SetProbeId(target)
 	return nil
 }
@@ -745,11 +753,11 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 
 	switch command {
 	case "execId":
-		err = e.doExecId(target)
+		err = e.doExecId(cmd)
 	case "probe":
-		err = e.doProbeId(target)
+		err = e.doProbeId(cmd)
 	case "until":
-		err = e.doUntil(target, until)
+		err = e.doUntil(cmd)
 	case "open":
 		err = e.doNavigate(target)
 	case "setWindowSize":
@@ -821,13 +829,13 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "windowHandles":
 		err = e.doWindowHandles(id)
 	case "storeWindowHandle":
-		err = e.doStoreWindowHandle(target)
+		err = e.doStoreWindowHandle(cmd)
 	case "close":
-		err = e.doClose(target)
+		err = e.doClose(cmd)
 	case "status":
-		err = e.doStatus(id)
+		err = e.doStatus(cmd)
 	case "pause":
-		err = e.doPause(target)
+		err = e.doPause(cmd)
 	case "scrollTo":
 		err = e.doScrollTo(cmd)
 	case "scroll":
