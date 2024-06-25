@@ -131,6 +131,7 @@ func main() {
 	var buildAsset string
 	var imgDump bool
 	var listen string
+	var console bool
 
 	//wd.Example3()
 
@@ -150,6 +151,7 @@ func main() {
 	flag.StringVar(&listen, "y", "", "server listen")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
 	flag.BoolVar(&imgDump, "a", false, "image dump")
+	flag.BoolVar(&console, "e", false, "launch SAM console")
 
 	flag.Parse()
 
@@ -165,6 +167,14 @@ func main() {
 
 	if len(buildAsset) > 0 {
 		createAsset(buildAsset)
+		return
+	}
+
+	if console {
+		if err := executor.CreateConsole(); err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 		return
 	}
 

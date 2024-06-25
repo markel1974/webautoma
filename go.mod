@@ -1,6 +1,6 @@
 module github.com/markel1974/webautoma
 
-go 1.17
+go 1.20
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -8,6 +8,11 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/mediabuyerbot/go-crx3 v1.3.1
 	golang.org/x/image v0.6.0
+	golang.org/x/term v0.5.0
+	nhooyr.io/websocket v1.8.11
 )
 
-require google.golang.org/protobuf v1.26.0 // indirect
+require (
+	golang.org/x/sys v0.5.0 // indirect
+	google.golang.org/protobuf v1.26.0 // indirect
+)

@@ -892,49 +892,100 @@ func (e *Executor) doComputeJump(target string, commands []ConfigCommand) (int, 
 	return -1, fmt.Errorf("undefined id: " + target)
 }
 
+func (e *Executor) doCommand(commands []ConfigCommand, idx int) (string, int, error) {
+	if idx >= len(commands) {
+		return "", -1, fmt.Errorf("invalid index %d", idx)
+	}
+	cmd := commands[idx]
+	jump := -1
+	if e.adapter.IsDebugEnabled() {
+		fmt.Printf("--------------------------------------------------------------\n")
+		fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
+	}
+	err := e.templates.BuildCommand(cmd, e.stack)
+	if err != nil {
+		return cmd.Id, -1, err
+	}
+	if cmd.Command == "jump" {
+		var j int
+		if j, err = e.doComputeJump(cmd.Target, commands); err == nil {
+			jump = j
+		}
+	} else {
+		if e.lastFrame != nil {
+			////if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
+			////	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchParentFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+			////}
+			//if frameErr := e.adapter.SwitchFrame(""); frameErr != nil {
+			//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+			//}
+			//if frameErr := e.adapter.SwitchFrame(e.lastFrame); frameErr != nil {
+			//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+			//}
+		}
+		err = e.commandExec(cmd)
+	}
+	if e.adapter.IsDebugEnabled() {
+		fmt.Printf("Error: %v\n", err)
+	}
+	if e.adapter.IsErrorDisabled() {
+		err = nil
+	}
+	if err != nil {
+		return cmd.Id, -1, err
+	}
+	return "", jump, err
+}
+
 func (e *Executor) commandsLoop() (string, error) {
 	for _, test := range e.cfg.Tests {
 		for x := 0; x < len(test.Commands); x++ {
-			cmd := test.Commands[x]
-			if e.adapter.IsDebugEnabled() {
-				fmt.Printf("--------------------------------------------------------------\n")
-				fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
-			}
-			err := e.templates.BuildCommand(cmd, e.stack)
+			id, jump, err := e.doCommand(test.Commands, x)
 			if err != nil {
-				return cmd.Id, err
+				return id, err
 			}
-			if cmd.Command == "jump" {
-				var jump int
-				if jump, err = e.doComputeJump(cmd.Target, test.Commands); err == nil {
-					x = jump
+			if jump >= 0 {
+				x = jump
+			}
+			/*
+				cmd := test.Commands[x]
+				if e.adapter.IsDebugEnabled() {
+					fmt.Printf("--------------------------------------------------------------\n")
+					fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
 				}
-			} else {
-				if e.lastFrame != nil {
-					/*
-						//if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
-						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchParentFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+				err := e.templates.BuildCommand(cmd, e.stack)
+				if err != nil {
+					return cmd.Id, err
+				}
+				if cmd.Command == "jump" {
+					var jump int
+					if jump, err = e.doComputeJump(cmd.Target, test.Commands); err == nil {
+						x = jump
+					}
+				} else {
+					if e.lastFrame != nil {
+						////if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
+						////	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchParentFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+						////}
+						//if frameErr := e.adapter.SwitchFrame(""); frameErr != nil {
+						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
 						//}
-						if frameErr := e.adapter.SwitchFrame(""); frameErr != nil {
-							e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
-						}
-						if frameErr := e.adapter.SwitchFrame(e.lastFrame); frameErr != nil {
-							e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
-						}
-					*/
+						//if frameErr := e.adapter.SwitchFrame(e.lastFrame); frameErr != nil {
+						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
+						//}
+					}
+					err = e.commandExec(cmd)
 				}
-				err = e.commandExec(cmd)
-			}
-			if e.adapter.IsDebugEnabled() {
-				fmt.Printf("Error: %v\n", err)
-			}
-
-			if e.adapter.IsErrorDisabled() {
-				err = nil
-			}
-			if err != nil {
-				return cmd.Id, err
-			}
+				if e.adapter.IsDebugEnabled() {
+					fmt.Printf("Error: %v\n", err)
+				}
+				if e.adapter.IsErrorDisabled() {
+					err = nil
+				}
+				if err != nil {
+					return cmd.Id, err
+				}
+			*/
 		}
 	}
 	return "", nil
