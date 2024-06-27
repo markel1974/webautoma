@@ -39,6 +39,7 @@ type Executor struct {
 	execId    string
 	lastFrame interface{}
 	baseUrl   string
+	sam       *SamConsole
 }
 
 func New(driver base.IWebDriver) *Executor {
@@ -52,6 +53,7 @@ func New(driver base.IWebDriver) *Executor {
 		execId:    "",
 		lastFrame: nil,
 		baseUrl:   "",
+		sam:       nil,
 	}
 	return e
 }
@@ -265,6 +267,30 @@ func (e *Executor) doSelectParentFrame() error {
 
 func (e *Executor) doSelectWindowMain() error {
 	return e.adapter.SelectWindowMain()
+}
+
+func (e *Executor) doListWindows() ([]string, error) {
+	var out []string
+	currentWindow, err := e.adapter.CurrentWindowHandle()
+	if err != nil {
+		return nil, err
+	}
+	windows, err := e.adapter.WindowHandles()
+	if err != nil {
+		return nil, err
+	}
+	for _, window := range windows {
+		if err = e.adapter.SwitchWindow(window); err != nil {
+			continue
+		}
+		windowTitle, err := e.adapter.Title()
+		if err != nil {
+			continue
+		}
+		out = append(out, windowTitle)
+	}
+	_ = e.adapter.SwitchWindow(currentWindow)
+	return out, nil
 }
 
 func (e *Executor) doSelectWindowTitle(title string) error {
@@ -521,6 +547,15 @@ func (e *Executor) doPause(cmd ConfigCommand) error {
 func (e *Executor) doSetTimeout(value string) error {
 	e.adapter.SetWait(parseInt(value))
 	return nil
+}
+
+func (e *Executor) doRetrieveNetworkHeaders() (string, error) {
+	return e.adapter.NetworkHeaders()
+}
+
+func (e *Executor) doRetrievePageSource() (string, error) {
+	v, err := e.adapter.PageSource()
+	return v, err
 }
 
 func (e *Executor) doPageSource(id string) error {
@@ -947,61 +982,19 @@ func (e *Executor) commandsLoop() (string, error) {
 			if jump >= 0 {
 				x = jump
 			}
-			/*
-				cmd := test.Commands[x]
-				if e.adapter.IsDebugEnabled() {
-					fmt.Printf("--------------------------------------------------------------\n")
-					fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
-				}
-				err := e.templates.BuildCommand(cmd, e.stack)
-				if err != nil {
-					return cmd.Id, err
-				}
-				if cmd.Command == "jump" {
-					var jump int
-					if jump, err = e.doComputeJump(cmd.Target, test.Commands); err == nil {
-						x = jump
-					}
-				} else {
-					if e.lastFrame != nil {
-						////if frameErr := e.adapter.SwitchParentFrame(); frameErr != nil {
-						////	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchParentFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
-						////}
-						//if frameErr := e.adapter.SwitchFrame(""); frameErr != nil {
-						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
-						//}
-						//if frameErr := e.adapter.SwitchFrame(e.lastFrame); frameErr != nil {
-						//	e.adapter.log(LogLevelWarning, fmt.Sprintf("SwitchFrame error :%s (last frame: %v)", frameErr.Error(), e.lastFrame))
-						//}
-					}
-					err = e.commandExec(cmd)
-				}
-				if e.adapter.IsDebugEnabled() {
-					fmt.Printf("Error: %v\n", err)
-				}
-				if e.adapter.IsErrorDisabled() {
-					err = nil
-				}
-				if err != nil {
-					return cmd.Id, err
-				}
-			*/
 		}
 	}
 	return "", nil
 }
 
-func (e *Executor) Start() error {
+func (e *Executor) Start(sam bool) error {
 	e.start = time.Now()
-
 	e.adapter.log(LogLevelInfo, "Sample started")
-
 	err := e.adapter.SetRootWindow()
 	if err != nil {
 		e.finalize(err)
 		return err
 	}
-
 	url, err := e.templates.Apply(e.cfg.Url, nil)
 	if err != nil {
 		e.finalize(err)
@@ -1011,15 +1004,26 @@ func (e *Executor) Start() error {
 		e.finalize(err)
 		return err
 	}
-
 	e.adapter.log(LogLevelInfo, "mainWindow: "+e.adapter.GetRootWindow())
-
-	var id string
-	if id, err = e.commandsLoop(); err != nil {
-		e.finalize(fmt.Errorf("%s (%s)", err.Error(), id))
-		return err
+	if !sam {
+		var id string
+		if id, err = e.commandsLoop(); err != nil {
+			e.finalize(fmt.Errorf("%s (%s)", err.Error(), id))
+			return err
+		}
+		e.finalize(nil)
+	} else {
+		e.sam = NewSam(e)
+		if err = e.sam.Start(); err != nil {
+			return err
+		}
 	}
-
-	e.finalize(nil)
 	return nil
+}
+
+func (e *Executor) SamSendMessage(s ISamMessage) {
+	if e.sam == nil {
+		return
+	}
+	e.sam.SendMessage(s)
 }

@@ -83,7 +83,7 @@ func createVariables(variables string) (map[string]interface{}, error) {
 	return varData, nil
 }
 
-func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, imgDump bool, capture string, variables string) error {
+func launch(console bool, wdUrl *url.URL, args []string, sideFile string, resultFile string, imgFile string, imgDump bool, capture string, variables string) error {
 	chromeCaps := chrome.Caps{}
 	for _, arg := range args {
 		chromeCaps.Args = append(chromeCaps.Args, arg /*"headless"*/)
@@ -102,13 +102,13 @@ func launch(wdUrl *url.URL, args []string, sideFile string, resultFile string, i
 	}
 	captureData := createCapture(capture)
 	exec := executor.New(driver)
+
 	if err = exec.Setup(sideFile, resultFile, imgFile, imgDump, captureData, variablesData); err != nil {
 		return err
 	}
-	if err = exec.Start(); err != nil {
+	if err = exec.Start(console); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -167,14 +167,6 @@ func main() {
 
 	if len(buildAsset) > 0 {
 		createAsset(buildAsset)
-		return
-	}
-
-	if console {
-		if err := executor.CreateConsole(); err != nil {
-			fmt.Println(err.Error())
-			return
-		}
 		return
 	}
 
@@ -241,7 +233,7 @@ func main() {
 		counter := -1
 		for scanner.Scan() {
 			counter++
-			if err := launch(wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, scanner.Text()); err != nil {
+			if err := launch(console, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, scanner.Text()); err != nil {
 				log.Printf("line %d: %s", counter, err.Error())
 			}
 		}
@@ -249,7 +241,7 @@ func main() {
 			log.Printf("line %d: %s", counter, err.Error())
 		}
 	} else {
-		if err := launch(wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, variables); err != nil {
+		if err = launch(console, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, variables); err != nil {
 			log.Fatal(err.Error())
 		}
 	}

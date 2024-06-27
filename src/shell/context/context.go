@@ -114,7 +114,7 @@ func (c *Context) SetEnterKey(key rune) {
 func (c *Context) Close() {
 }
 
-func (c *Context) Exec() {
+func (c *Context) Exec(async bool) {
 	go func() {
 		readBuffer := make([]byte, 16)
 		for {
@@ -145,7 +145,13 @@ func (c *Context) Exec() {
 		}
 	}()
 
-	c.eventLoop()
+	if async {
+		go func() {
+			c.eventLoop()
+		}()
+	} else {
+		c.eventLoop()
+	}
 }
 
 func (c *Context) execCommand(line string) bool {

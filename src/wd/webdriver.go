@@ -338,7 +338,9 @@ func (wd *WebDriver) CurrentURL() (string, error) {
 
 func (wd *WebDriver) Navigate(navigateUrl string) error {
 	lowerUrl := strings.ToLower(navigateUrl)
-	if strings.HasPrefix(lowerUrl, "file") {
+	if lowerUrl == "about:blank" {
+		//
+	} else if strings.HasPrefix(lowerUrl, "file") {
 		//
 	} else {
 		if !strings.HasPrefix(lowerUrl, "http") {

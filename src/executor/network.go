@@ -79,6 +79,26 @@ func (n *Network) Acquired() map[string]interface{} {
 	return n.acquired
 }
 
+func (n *Network) Headers(logEntries []base.LogMessage) map[string]interface{} {
+	headersData := make(map[string]interface{})
+	for _, entry := range logEntries {
+		var network NetworkMessage
+		if err := json.Unmarshal([]byte(entry.Message), &network); err != nil {
+			log.Println(err.Error())
+			continue
+		}
+		currentURL, currentStatus, currentHeaders, contentType := n.getResponseParams(network)
+		headersData[currentURL] = map[string]interface{}{
+			"url":           currentURL,
+			"headers":       currentHeaders,
+			"content-type":  contentType,
+			"status":        currentStatus,
+			"messageMethod": network.Message.Method,
+		}
+	}
+	return headersData
+}
+
 func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{}, int) {
 	errorCount := 0
 	var headersData map[string]interface{}
@@ -151,6 +171,9 @@ func (n *Network) Compute(logEntries []base.LogMessage) (map[string]interface{},
 		//TODO le url non possono stare tra le chiavi....
 		//"result":     headersData,
 	}
+	//if data {
+	//	network["result"] = headersData
+	//}
 	return network, errorCount
 }
 

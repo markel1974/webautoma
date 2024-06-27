@@ -38,7 +38,7 @@ func Create(autoSave bool, template *cli.Command) error {
 	ctx := context.NewContext(ticker, reader, writer, auth, factory, template, prompt, autoSave)
 	//ctx.SetEnterKey(13)
 	ctx.Setup("VT100", false)
-	ctx.Exec()
+	ctx.Exec(true)
 
 	return nil
 }

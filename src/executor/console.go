@@ -1,12 +1,250 @@
 package executor
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/markel1974/webautoma/src/shell"
 	"github.com/markel1974/webautoma/src/shell/cli"
+	"os"
+	"strconv"
+	"strings"
 )
 
-func commandHandler() *cli.Command {
+const (
+	MessageNext      = 0
+	MessagePrev      = 1
+	MessageStep      = 2
+	MessageList      = 3
+	MessageRedo      = 4
+	MessageStop      = 5
+	MessageRun       = 6
+	MessageEdit      = 7
+	MessageJump      = 8
+	MessageCurr      = 9
+	MessagePrintHtml = 11
+	MessagePrintNet  = 12
+	MessageWindows   = 13
+	MessageQuit      = 255
+)
+
+type ISamMessage interface {
+	GetType() int
+	SetResponse(id string, x int, result string, err error)
+	GetResponse() []string
+}
+
+type SamMessage struct {
+	kind     int
+	response chan []string
+}
+
+func NewSamMessage(kind int) *SamMessage {
+	return &SamMessage{
+		kind:     kind,
+		response: make(chan []string),
+	}
+}
+func (s *SamMessage) GetType() int {
+	return s.kind
+}
+func (s *SamMessage) SetResponse(id string, x int, result string, err error) {
+	var out []string
+	var status string
+	if err != nil {
+		v := strings.Replace(err.Error(), "\r", "", -1)
+		out = append(out, strings.Split(v, "\n")...)
+		status = "err"
+	} else {
+		if len(result) > 0 {
+			p := strings.Replace(result, "\r", "", -1)
+			out = append(out, strings.Split(p, "\n")...)
+		}
+		status = "ok"
+	}
+	out = append(out, fmt.Sprintf("%s *[%d] -> %s", status, x, id))
+	s.response <- out
+}
+func (s *SamMessage) GetResponse() []string {
+	v := <-s.response
+	return v
+}
+
+type SamMessageJump struct {
+	*SamMessage
+	jump int
+}
+
+func NewSamMessageJump(jump int) *SamMessageJump {
+	return &SamMessageJump{
+		SamMessage: NewSamMessage(MessageJump),
+		jump:       jump,
+	}
+}
+func (smj *SamMessageJump) Jump() int {
+	return smj.jump
+}
+
+type SamMessageStep struct {
+	*SamMessage
+	advance bool
+}
+
+func NewSamMessageStep(advance bool) *SamMessageStep {
+	return &SamMessageStep{
+		SamMessage: NewSamMessage(MessageStep),
+		advance:    advance,
+	}
+}
+func (smj *SamMessageStep) Advance() bool {
+	return smj.advance
+}
+
+type SamMessageHTML struct {
+	*SamMessage
+	fileId string
+}
+
+func NewSamMessageHTML(fileId string) *SamMessageHTML {
+	return &SamMessageHTML{
+		SamMessage: NewSamMessage(MessagePrintHtml),
+		fileId:     fileId,
+	}
+}
+func (smj *SamMessageHTML) FileId() string {
+	return smj.fileId
+}
+
+type SamMessageNet struct {
+	*SamMessage
+	fileId string
+}
+
+func NewSamMessageNet(fileId string) *SamMessageNet {
+	return &SamMessageNet{
+		SamMessage: NewSamMessage(MessagePrintNet),
+		fileId:     fileId,
+	}
+}
+func (smj *SamMessageNet) FileId() string {
+	return smj.fileId
+}
+
+type SamMessages chan ISamMessage
+
+type SamConsole struct {
+	e        *Executor
+	messages SamMessages
+}
+
+func NewSam(e *Executor) *SamConsole {
+	return &SamConsole{
+		e:        e,
+		messages: make(SamMessages, 64),
+	}
+}
+
+func (sm *SamConsole) Start() error {
+	if err := shell.Create(false, sm.commandHandler()); err != nil {
+		return err
+	}
+	sm.eventLoop()
+	return nil
+}
+
+func (sm *SamConsole) runCommand(cmd *cli.Command, pid int, s ISamMessage) {
+	fmt.Printf("\r\n%s", "waiting....")
+	r := cmd.GetRootContext()
+	sm.e.SamSendMessage(s)
+	resp := s.GetResponse()
+	fmt.Printf("\r%s", "           ")
+	fmt.Printf("\r%s", strings.Join(resp, "\r\n"))
+	r.Deactivate(pid)
+}
+
+func (sm *SamConsole) SendMessage(m ISamMessage) {
+	sm.messages <- m
+}
+
+func (sm *SamConsole) eventLoop() {
+	test := sm.e.cfg.Tests[0]
+	pc := 0
+
+	for {
+		select {
+		case msg := <-sm.messages:
+			switch msg.GetType() {
+			case MessageNext:
+				pc++
+				if pc >= len(test.Commands) {
+					pc = 0
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, "", nil)
+			case MessagePrev:
+				pc--
+				if pc < 0 {
+					pc = 0
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, "", nil)
+			case MessageStep:
+				sms := msg.(*SamMessageStep)
+				_, jump, err := sm.e.doCommand(test.Commands, pc)
+				if err != nil {
+					msg.SetResponse(test.Commands[pc].Id, pc, "", err)
+					continue
+				}
+				var pre string
+				if sms.Advance() {
+					if jump >= 0 {
+						pc = jump
+						pre = "jump found"
+					} else {
+						pc++
+					}
+					if pc < 0 || pc >= len(test.Commands) {
+						pc = 0
+					}
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, pre, nil)
+			case MessageList:
+				m, _ := json.MarshalIndent(test.Commands, "", "  ")
+				msg.SetResponse(test.Commands[pc].Id, pc, string(m), nil)
+			case MessageCurr:
+				m, _ := json.MarshalIndent(test.Commands[pc], "", "  ")
+				msg.SetResponse(test.Commands[pc].Id, pc, string(m), nil)
+			case MessageJump:
+				if msgJump, ok := msg.(*SamMessageJump); ok {
+					pc = msgJump.Jump()
+					if pc < 0 || pc >= len(test.Commands) {
+						pc = 0
+					}
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, "", nil)
+			case MessagePrintHtml:
+				smh := msg.(*SamMessageHTML)
+				h, err := sm.e.doRetrievePageSource()
+				if len(smh.FileId()) > 0 {
+					_ = os.WriteFile(smh.FileId(), []byte(h), 0644)
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, h, err)
+			case MessagePrintNet:
+				smh := msg.(*SamMessageNet)
+				n, err := sm.e.doRetrieveNetworkHeaders()
+				if len(smh.FileId()) > 0 {
+					_ = os.WriteFile(smh.FileId(), []byte(n), 0644)
+				}
+				msg.SetResponse(test.Commands[pc].Id, pc, n, err)
+			case MessageWindows:
+				v, _ := sm.e.doListWindows()
+				m, _ := json.MarshalIndent(v, "", "  ")
+				msg.SetResponse(test.Commands[pc].Id, pc, string(m), nil)
+			case MessageQuit:
+				return
+			}
+		}
+	}
+}
+
+func (sm *SamConsole) commandHandler() *cli.Command {
 	root := cli.NewCommand()
 	root.Run = func(cmd *cli.Command, pid int, args []string) {}
 	root.Use = "root"
@@ -19,9 +257,8 @@ func commandHandler() *cli.Command {
 	next.Long = "Move cursor to next command"
 	next.Short = next.Long
 	next.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\nBar is opened, pid %d", pid))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessageNext)
+		sm.runCommand(cmd, pid, msg)
 	}
 	next.ReadEvent = func(cmd *cli.Command, pid int, ctx interface{}, code int, key rune) {
 	}
@@ -32,9 +269,8 @@ func commandHandler() *cli.Command {
 	prev.Short = prev.Long
 	prev.Activate = false
 	prev.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "prev 1"))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessagePrev)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	step := cli.NewCommand()
@@ -43,9 +279,8 @@ func commandHandler() *cli.Command {
 	step.Short = step.Long
 	step.Activate = false
 	step.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "stop 2"))
-		r.Deactivate(pid)
+		msg := NewSamMessageStep(true)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	redo := cli.NewCommand()
@@ -54,9 +289,8 @@ func commandHandler() *cli.Command {
 	redo.Short = redo.Long
 	redo.Activate = false
 	redo.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "redo 3"))
-		r.Deactivate(pid)
+		msg := NewSamMessageStep(false)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	stop := cli.NewCommand()
@@ -65,9 +299,8 @@ func commandHandler() *cli.Command {
 	stop.Short = stop.Long
 	stop.Activate = false
 	stop.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "stop 4"))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessageStop)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	run := cli.NewCommand()
@@ -76,9 +309,8 @@ func commandHandler() *cli.Command {
 	run.Short = run.Long
 	run.Activate = false
 	run.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "run 5"))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessageRun)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	edit := cli.NewCommand()
@@ -87,20 +319,24 @@ func commandHandler() *cli.Command {
 	edit.Short = edit.Long
 	edit.Activate = false
 	edit.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "edit 6"))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessageEdit)
+		sm.runCommand(cmd, pid, msg)
 	}
 
-	goTo := cli.NewCommand()
-	goTo.Use = "goto"
-	goTo.Long = "Set current command"
-	goTo.Short = goTo.Long
-	goTo.Activate = false
-	goTo.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "goto 7"))
-		r.Deactivate(pid)
+	jump := cli.NewCommand()
+	jump.Use = "jump"
+	jump.Long = "Set current command"
+	jump.Short = jump.Long
+	jump.Activate = false
+	jump.Run = func(cmd *cli.Command, pid int, args []string) {
+		j := -1
+		if len(args) > 0 {
+			if v, err := strconv.Atoi(args[0]); err == nil {
+				j = v
+			}
+		}
+		msg := NewSamMessageJump(j)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	list := cli.NewCommand()
@@ -109,20 +345,18 @@ func commandHandler() *cli.Command {
 	list.Short = list.Long
 	list.Activate = false
 	list.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "Test"))
-		r.Deactivate(pid)
+		msg := NewSamMessage(MessageList)
+		sm.runCommand(cmd, pid, msg)
 	}
 
-	cursor := cli.NewCommand()
-	cursor.Use = "cursor"
-	cursor.Long = "Current cursor position"
-	cursor.Short = cursor.Long
-	cursor.Activate = true
-	cursor.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "Test"))
-		r.Deactivate(pid)
+	curr := cli.NewCommand()
+	curr.Use = "curr"
+	curr.Long = "Current cursor position"
+	curr.Short = curr.Long
+	curr.Activate = true
+	curr.Run = func(cmd *cli.Command, pid int, args []string) {
+		msg := NewSamMessage(MessageCurr)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	printS := cli.NewCommand()
@@ -132,19 +366,22 @@ func commandHandler() *cli.Command {
 	printS.Activate = true
 	printS.Run = func(cmd *cli.Command, pid int, args []string) {
 		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "Test"))
+		fmt.Printf("\r\nmissing arguments")
 		r.Deactivate(pid)
 	}
 
 	printHTML := cli.NewCommand()
 	printHTML.Use = "html"
-	printHTML.Long = "Print current html page"
+	printHTML.Long = "Print current html page [fileId]"
 	printHTML.Short = printHTML.Long
 	printHTML.Activate = true
 	printHTML.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "Test"))
-		r.Deactivate(pid)
+		fileId := ""
+		if len(args) > 0 {
+			fileId = args[0]
+		}
+		msg := NewSamMessageHTML(fileId)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	printNetwork := cli.NewCommand()
@@ -153,9 +390,32 @@ func commandHandler() *cli.Command {
 	printNetwork.Short = printNetwork.Long
 	printNetwork.Activate = true
 	printNetwork.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
-		r.WriteLn(fmt.Sprintf("\r\n" + "Test"))
-		r.Deactivate(pid)
+		fileId := ""
+		if len(args) > 0 {
+			fileId = args[0]
+		}
+		msg := NewSamMessageNet(fileId)
+		sm.runCommand(cmd, pid, msg)
+	}
+
+	windows := cli.NewCommand()
+	windows.Use = "windows"
+	windows.Long = "Print available windows"
+	windows.Short = windows.Long
+	windows.Activate = true
+	windows.Run = func(cmd *cli.Command, pid int, args []string) {
+		msg := NewSamMessage(MessageWindows)
+		sm.runCommand(cmd, pid, msg)
+	}
+
+	quit := cli.NewCommand()
+	quit.Use = "exit"
+	quit.Long = "exit"
+	quit.Short = quit.Long
+	quit.Activate = true
+	quit.Run = func(cmd *cli.Command, pid int, args []string) {
+		msg := NewSamMessage(MessageQuit)
+		sm.runCommand(cmd, pid, msg)
 	}
 
 	_ = printS.AddCommand(printHTML)
@@ -167,17 +427,11 @@ func commandHandler() *cli.Command {
 	_ = root.AddCommand(redo)
 	_ = root.AddCommand(stop)
 	_ = root.AddCommand(run)
-	_ = root.AddCommand(goTo)
+	_ = root.AddCommand(jump)
 	_ = root.AddCommand(list)
-	_ = root.AddCommand(cursor)
+	_ = root.AddCommand(curr)
 	_ = root.AddCommand(printS)
+	_ = root.AddCommand(windows)
+	_ = root.AddCommand(quit)
 	return root
-}
-
-func CreateConsole() error {
-	if err := shell.Create(false, commandHandler()); err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-	return nil
 }

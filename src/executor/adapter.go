@@ -449,6 +449,16 @@ func (e *Adapter) MouseActions(by string, data string, command string, value str
 	return err
 }
 
+func (e *Adapter) NetworkHeaders() (string, error) {
+	logEntries, logErr := e.driver.Log(base.LogPerformance)
+	if logErr != nil {
+		e.log(LogLevelCritical, logErr.Error())
+	}
+	n := e.network.Headers(logEntries)
+	out, _ := json.MarshalIndent(n, "", "  ")
+	return string(out), nil
+}
+
 func (e *Adapter) Screenshot(screenshotId string) error {
 	//480p = 858 x 480 - 720p = 1280 x 720 - 1080p = 1920 x 1080 — FullHD
 	screenshot, err := e.driver.Screenshot()
