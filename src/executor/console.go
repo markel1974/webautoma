@@ -6,6 +6,7 @@ import (
 	"github.com/markel1974/webautoma/src/shell"
 	"github.com/markel1974/webautoma/src/shell/cli"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -67,6 +68,23 @@ func (s *SamMessage) SetResponse(id string, x int, result string, err error) {
 func (s *SamMessage) GetResponse() []string {
 	v := <-s.response
 	return v
+}
+
+type SamMessageEdit struct {
+	*SamMessage
+	key string
+	val string
+}
+
+func NewSamMessageEdit(key string, val string) *SamMessageEdit {
+	return &SamMessageEdit{
+		SamMessage: NewSamMessage(MessageEdit),
+		key:        key,
+		val:        val,
+	}
+}
+func (sme *SamMessageEdit) KeyVal() (string, string) {
+	return sme.key, sme.val
 }
 
 type SamMessageJump struct {
@@ -212,13 +230,17 @@ func (sm *SamConsole) eventLoop() {
 				m, _ := json.MarshalIndent(test.Commands[pc], "", "  ")
 				msg.SetResponse(test.Commands[pc].Id, pc, string(m), nil)
 			case MessageJump:
-				if msgJump, ok := msg.(*SamMessageJump); ok {
-					pc = msgJump.Jump()
-					if pc < 0 || pc >= len(test.Commands) {
-						pc = 0
-					}
+				msgJump := msg.(*SamMessageJump)
+				pc = msgJump.Jump()
+				if pc < 0 || pc >= len(test.Commands) {
+					pc = 0
 				}
 				msg.SetResponse(test.Commands[pc].Id, pc, "", nil)
+			case MessageEdit:
+				msgEdit := msg.(*SamMessageEdit)
+				k, v := msgEdit.KeyVal()
+				err := AlterObject(k, v, &test.Commands[pc])
+				msg.SetResponse(test.Commands[pc].Id, pc, "", err)
 			case MessagePrintHtml:
 				smh := msg.(*SamMessageHTML)
 				h, err := sm.e.doRetrievePageSource()
@@ -319,7 +341,15 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	edit.Short = edit.Long
 	edit.Activate = false
 	edit.Run = func(cmd *cli.Command, pid int, args []string) {
-		msg := NewSamMessage(MessageEdit)
+		r := cmd.GetRootContext()
+		if len(args) < 2 {
+			fmt.Printf("\r\nmissing arguments")
+			r.Deactivate(pid)
+			return
+		}
+		key := args[0]
+		val := args[1]
+		msg := NewSamMessageEdit(key, val)
 		sm.runCommand(cmd, pid, msg)
 	}
 
@@ -365,9 +395,8 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	printS.Short = printS.Long
 	printS.Activate = true
 	printS.Run = func(cmd *cli.Command, pid int, args []string) {
-		r := cmd.GetRootContext()
 		fmt.Printf("\r\nmissing arguments")
-		r.Deactivate(pid)
+		cmd.GetRootContext().Deactivate(pid)
 	}
 
 	printHTML := cli.NewCommand()
@@ -428,10 +457,63 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	_ = root.AddCommand(stop)
 	_ = root.AddCommand(run)
 	_ = root.AddCommand(jump)
+	_ = root.AddCommand(edit)
 	_ = root.AddCommand(list)
 	_ = root.AddCommand(curr)
 	_ = root.AddCommand(printS)
 	_ = root.AddCommand(windows)
 	_ = root.AddCommand(quit)
 	return root
+}
+
+func AlterObject(k string, v string, cmd interface{}) error {
+	rv := reflect.ValueOf(cmd)
+	trv := reflect.TypeOf(cmd)
+	if rv.Kind() != reflect.Pointer {
+		return fmt.Errorf("object isn't a pointer")
+	}
+	rv = reflect.ValueOf(cmd).Elem()
+	trv = reflect.TypeOf(cmd).Elem()
+	if rv.IsZero() {
+		return fmt.Errorf("invalid object")
+	}
+	//fmt.Println(rv.CanSet())
+	//value := reflect.New(rv.Type())
+	for i := 0; i < rv.NumField(); i++ {
+		fieldValue := rv.Field(i)
+		fieldType := trv.Field(i)
+		name := fieldType.Name
+		tagName, _ := fieldType.Tag.Lookup("json")
+		if tagName != k && name != k {
+			continue
+		}
+
+		switch fieldValue.Kind() {
+		case reflect.String:
+			fieldValue.SetString(v)
+			return nil
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint64, reflect.Uint32:
+			d, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return err
+			}
+			fieldValue.SetInt(d)
+			return nil
+		case reflect.Float64, reflect.Float32:
+			f, err := strconv.ParseFloat(v, 64)
+			if err == nil {
+				return err
+			}
+			fieldValue.SetFloat(f)
+			return nil
+		case reflect.Bool:
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return err
+			}
+			fieldValue.SetBool(b)
+			return nil
+		}
+	}
+	return fmt.Errorf("unupported")
 }
