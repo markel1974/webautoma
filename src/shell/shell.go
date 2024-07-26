@@ -24,7 +24,7 @@ import (
 	"os"
 )
 
-func Create(autoSave bool, template *cli.Command) error {
+func Create(autoSave bool, template *cli.Command, quit chan bool) error {
 	prompt := "% "
 	factory := terminal.NewEquipmentFactory()
 	ticker := adaptiveticker.NewAdaptiveTicker()
@@ -38,7 +38,7 @@ func Create(autoSave bool, template *cli.Command) error {
 	ctx := context.NewContext(ticker, reader, writer, auth, factory, template, prompt, autoSave)
 	//ctx.SetEnterKey(13)
 	ctx.Setup("VT100", false)
-	ctx.Exec(true)
+	ctx.Exec(true, quit)
 
 	return nil
 }

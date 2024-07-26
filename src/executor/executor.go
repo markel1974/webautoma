@@ -934,8 +934,15 @@ func (e *Executor) doCommand(commands []ConfigCommand, idx int) (string, int, er
 	cmd := commands[idx]
 	jump := -1
 	if e.adapter.IsDebugEnabled() {
-		fmt.Printf("--------------------------------------------------------------\n")
-		fmt.Printf("Next command is [%s] %s: %s\n", cmd.Id, cmd.Command, cmd.Target)
+		l1 := fmt.Sprintf("--------------------------------------------------------------")
+		l2 := fmt.Sprintf("Next command is [%s] %s: %s", cmd.Id, cmd.Command, cmd.Target)
+		if e.sam != nil {
+			e.sam.Print(l1)
+			e.sam.Print(l2)
+		} else {
+			fmt.Printf("%s\n", l1)
+			fmt.Printf("%s\n", l2)
+		}
 	}
 	err := e.templates.BuildCommand(cmd, e.stack)
 	if err != nil {
@@ -961,7 +968,17 @@ func (e *Executor) doCommand(commands []ConfigCommand, idx int) (string, int, er
 		err = e.commandExec(cmd)
 	}
 	if e.adapter.IsDebugEnabled() {
-		fmt.Printf("Error: %v\n", err)
+		var l1 string
+		if err != nil {
+			l1 = fmt.Sprintf("Error: %v", err)
+		} else {
+			l1 = fmt.Sprintf("Ok")
+		}
+		if e.sam != nil {
+			e.sam.Print(l1)
+		} else {
+			fmt.Printf("%s\n", l1)
+		}
 	}
 	if e.adapter.IsErrorDisabled() {
 		err = nil

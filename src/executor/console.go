@@ -105,12 +105,14 @@ func (smj *SamMessageJump) Jump() int {
 type SamMessageStep struct {
 	*SamMessage
 	advance bool
+	count   int
 }
 
-func NewSamMessageStep(advance bool) *SamMessageStep {
+func NewSamMessageStep(advance bool, count int) *SamMessageStep {
 	return &SamMessageStep{
 		SamMessage: NewSamMessage(MessageStep),
 		advance:    advance,
+		count:      count,
 	}
 }
 func (smj *SamMessageStep) Advance() bool {
@@ -162,11 +164,18 @@ func NewSam(e *Executor) *SamConsole {
 }
 
 func (sm *SamConsole) Start() error {
-	if err := shell.Create(false, sm.commandHandler()); err != nil {
+	quit := make(chan bool)
+	if err := shell.Create(false, sm.commandHandler(), quit); err != nil {
 		return err
 	}
-	sm.eventLoop()
+	sm.eventLoop(quit)
 	return nil
+}
+
+func (sm *SamConsole) Print(s string) {
+	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.Replace(s, "\n", "\r\n", -1)
+	fmt.Printf("\r\n%s", s)
 }
 
 func (sm *SamConsole) runCommand(cmd *cli.Command, pid int, s ISamMessage) {
@@ -183,12 +192,16 @@ func (sm *SamConsole) SendMessage(m ISamMessage) {
 	sm.messages <- m
 }
 
-func (sm *SamConsole) eventLoop() {
+func (sm *SamConsole) eventLoop(quit chan bool) {
 	test := sm.e.cfg.Tests[0]
 	pc := 0
 
 	for {
 		select {
+		case q := <-quit:
+			if q {
+				return
+			}
 		case msg := <-sm.messages:
 			switch msg.GetType() {
 			case MessageNext:
@@ -205,24 +218,28 @@ func (sm *SamConsole) eventLoop() {
 				msg.SetResponse(test.Commands[pc].Id, pc, "", nil)
 			case MessageStep:
 				sms := msg.(*SamMessageStep)
-				_, jump, err := sm.e.doCommand(test.Commands, pc)
-				if err != nil {
-					msg.SetResponse(test.Commands[pc].Id, pc, "", err)
-					continue
-				}
 				var pre string
-				if sms.Advance() {
-					if jump >= 0 {
-						pc = jump
-						pre = "jump found"
-					} else {
-						pc++
+				var err error
+				for x := 0; x < sms.count; x++ {
+					var jump int
+					_, jump, err = sm.e.doCommand(test.Commands, pc)
+					if err != nil {
+						pre = ""
+						break
 					}
-					if pc < 0 || pc >= len(test.Commands) {
-						pc = 0
+					if sms.Advance() {
+						if jump >= 0 {
+							pc = jump
+							pre = "jump found"
+						} else {
+							pc++
+						}
+						if pc < 0 || pc >= len(test.Commands) {
+							pc = 0
+						}
 					}
 				}
-				msg.SetResponse(test.Commands[pc].Id, pc, pre, nil)
+				msg.SetResponse(test.Commands[pc].Id, pc, pre, err)
 			case MessageList:
 				m, _ := json.MarshalIndent(test.Commands, "", "  ")
 				msg.SetResponse(test.Commands[pc].Id, pc, string(m), nil)
@@ -301,7 +318,13 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	step.Short = step.Long
 	step.Activate = false
 	step.Run = func(cmd *cli.Command, pid int, args []string) {
-		msg := NewSamMessageStep(true)
+		count := 1
+		if len(args) > 0 {
+			if c, err := strconv.Atoi(args[0]); err == nil && c > 0 {
+				count = c
+			}
+		}
+		msg := NewSamMessageStep(true, count)
 		sm.runCommand(cmd, pid, msg)
 	}
 
@@ -311,7 +334,7 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	redo.Short = redo.Long
 	redo.Activate = false
 	redo.Run = func(cmd *cli.Command, pid int, args []string) {
-		msg := NewSamMessageStep(false)
+		msg := NewSamMessageStep(false, 1)
 		sm.runCommand(cmd, pid, msg)
 	}
 
