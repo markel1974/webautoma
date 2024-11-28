@@ -4,6 +4,9 @@ go 1.20
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/emersion/go-imap/v2 v2.0.0-beta.4
+	github.com/emersion/go-message v0.18.1
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/mediabuyerbot/go-crx3 v1.3.1

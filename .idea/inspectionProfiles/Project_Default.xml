@@ -15,6 +15,8 @@
         <method importPath="math/rand" receiver="*Rand" name="Read" />
         <method importPath="os" receiver="*File" name="Close" />
         <method importPath="io" receiver="ReadCloser" name="Close" />
+        <method importPath="github.com/emersion/go-imap/v2/imapclient" receiver="*Client" name="Close" />
+        <method importPath="github.com/emersion/go-imap/v2/imapclient" receiver="*FetchCommand" name="Close" />
       </methods>
     </inspection_tool>
   </profile>
