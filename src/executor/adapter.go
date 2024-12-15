@@ -265,25 +265,29 @@ func (e *Adapter) DeleteAllCookies() error {
 	return e.tester(e.wait, func() error { return e.driver.DeleteAllCookies() })
 }
 
-func (e *Adapter) GetCookie(id string) (string, error) {
+func (e *Adapter) GetCookie(mode string, name string) (string, error) {
 	return e.testerString(e.wait, func() (string, error) {
-		cookie, err := e.driver.GetCookie(id)
+		cookie, err := e.driver.GetCookie(name)
 		if err != nil {
 			return "", err
 		}
-		src, _ := json.Marshal(cookie)
-		return string(src), nil
+		if mode == "curl" {
+			return base.Cookies2Curl([]base.Cookie{cookie})
+		}
+		return base.Cookies2Json([]base.Cookie{cookie})
 	})
 }
 
-func (e *Adapter) GetCookies() (string, error) {
+func (e *Adapter) GetCookies(mode string) (string, error) {
 	return e.testerString(e.wait, func() (string, error) {
 		cookies, err := e.driver.GetCookies()
 		if err != nil {
 			return "", err
 		}
-		src, _ := json.Marshal(cookies)
-		return string(src), nil
+		if mode == "curl" {
+			return base.Cookies2Curl(cookies)
+		}
+		return base.Cookies2Json(cookies)
 	})
 }
 

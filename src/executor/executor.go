@@ -574,7 +574,14 @@ func (e *Executor) doStatus(cmd ConfigCommand) error {
 }
 
 func (e *Executor) doGetCookie(target string, id string, value string) error {
-	v, err := e.adapter.GetCookie(target)
+	mode := ""
+	name := target
+	k := strings.Split(name, ":")
+	if len(k) > 1 {
+		mode = k[0]
+		name = k[1]
+	}
+	v, err := e.adapter.GetCookie(mode, name)
 	if err != nil {
 		return err
 	}
@@ -589,8 +596,9 @@ func (e *Executor) doGetCookie(target string, id string, value string) error {
 	return nil
 }
 
-func (e *Executor) doGetAllCookies(id string, value string) error {
-	v, err := e.adapter.GetCookies()
+func (e *Executor) doGetAllCookies(target string, id string, value string) error {
+	mode := target
+	v, err := e.adapter.GetCookies(mode)
 	if err != nil {
 		return err
 	}
@@ -872,7 +880,7 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "pageSource":
 		err = e.doPageSource(id)
 	case "getAllCookies":
-		err = e.doGetAllCookies(id, value)
+		err = e.doGetAllCookies(target, id, value)
 	case "getCookie":
 		err = e.doGetCookie(target, id, value)
 	case "deleteAllCookies":
