@@ -81,7 +81,7 @@ type IWebDriver interface {
 	// Navigate Navigates the browser to the provided URL.
 	Navigate(url string) error
 
-	// Forward Forward moves forward in history.
+	// Forward moves in history.
 	Forward() error
 
 	// Back moves backward in history.
@@ -108,7 +108,7 @@ type IWebDriver interface {
 	// DecodeElements decodes a multi-element response.
 	DecodeElements([]byte) ([]IWebElement, error)
 
-	// GetCookies returns all of the cookies in the browser's jar.
+	// GetCookies returns all the cookies in the browser's jar.
 	GetCookies() ([]Cookie, error)
 
 	// GetCookie returns the named cookie in the jar, if present. This method is
@@ -118,7 +118,7 @@ type IWebDriver interface {
 	// AddCookie adds a cookie to the browser's jar.
 	AddCookie(cookie *Cookie) error
 
-	// DeleteAllCookies deletes all of the cookies in the browser's jar.
+	// DeleteAllCookies deletes all the cookies in the browser's jar.
 	DeleteAllCookies() error
 
 	// DeleteCookie deletes a cookie to the browser's jar.

@@ -3,7 +3,6 @@ package service
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -40,7 +39,7 @@ func (fb *FrameBuffer) Start() error {
 	}
 	defer r.Close()
 
-	auth, err := ioutil.TempFile("", "webautom-xvfb")
+	auth, err := os.CreateTemp("", "webautom-xvfb")
 	if err != nil {
 		return err
 	}

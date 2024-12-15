@@ -16,7 +16,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/mediabuyerbot/go-crx3/pb"
-	//"github.com/tebeka/selenium/internal/zip"
 )
 
 // CapabilitiesKey is the key in the top-level Caps map under which
@@ -50,7 +49,7 @@ type Caps struct {
 	// Prefs are the key/value pairs that are applied to the preferences of the
 	// user profile in use.
 	Prefs map[string]interface{} `json:"prefs,omitempty"`
-	// Detatch, if true, will cause the browser to not be killed when
+	// Detach, if true, will cause the browser to not be killed when
 	// ChromeDriver quits if the session was not terminated.
 	Detach *bool `json:"detach,omitempty"`
 	// DebuggerAddr is the TCP/IP address of a Chrome debugger server to connect
@@ -109,10 +108,10 @@ type PerfLoggingPreferences struct {
 	// EnableNetwork specifies whether of not to collect events from the Network
 	// domain. The default is true.
 	EnableNetwork *bool `json:"enableNetwork,omitempty"`
-	// EnablePage specifies whether or not to collect events from the Page
+	// EnablePage specifies whether to collect events from the Page
 	// domain. The default is true.
 	EnablePage *bool `json:"enablePage,omitempty"`
-	// EnableTimeline specifies whether or not to collect events from the
+	// EnableTimeline specifies whether to collect events from the
 	// Timeline domain. When tracing is enabled, Timeline domain is implicitly
 	// disabled, unless enableTimeline is explicitly set to true.
 	EnableTimeline *bool `json:"enableTimeline,omitempty"`
@@ -185,34 +184,29 @@ func NewExtensionWithKey(basePath string, key *rsa.PrivateKey) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	header, err := crx3Header(archiveBuf.Bytes(), key)
 	if err != nil {
 		return nil, err
 	}
-
 	// This format is documented at https://developer.chrome.com/extensions/crx .
 	buf := new(bytes.Buffer)
-	if _, err := buf.Write([]byte("Cr24")); err != nil { // Magic number.
+	if _, err = buf.Write([]byte("Cr24")); err != nil { // Magic number.
 		return nil, err
 	}
-
 	// Version.
-	if err := binary.Write(buf, binary.LittleEndian, uint32(3)); err != nil {
+	if err = binary.Write(buf, binary.LittleEndian, uint32(3)); err != nil {
 		return nil, err
 	}
-
 	// header length.
-	if err := binary.Write(buf, binary.LittleEndian, uint32(len(header))); err != nil {
+	if err = binary.Write(buf, binary.LittleEndian, uint32(len(header))); err != nil {
 		return nil, err
 	}
 	// header payload.
-	if err := binary.Write(buf, binary.LittleEndian, header); err != nil {
+	if err = binary.Write(buf, binary.LittleEndian, header); err != nil {
 		return nil, err
 	}
-
 	// Zipped extension directory payload.
-	if err := binary.Write(buf, binary.LittleEndian, archiveBuf.Bytes()); err != nil {
+	if err = binary.Write(buf, binary.LittleEndian, archiveBuf.Bytes()); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -228,15 +222,14 @@ func crx3Header(archiveData []byte, key *rsa.PrivateKey) ([]byte, error) {
 	// Signed Header
 
 	// From chromium / crx3.proto:
-	//
-	//  In the common case of a developer key proof, the first 128 bits of
-	//  the SHA-256 hash of the public key must equal the crx_id.
+	// In the common case of a developer key proof, the first 128 bits of
+	// the SHA-256 hash of the public key must equal the crx_id.
 	hash := sha256.New()
 	hash.Write(pubKey)
-	sdpb := &pb.SignedData{
+	pbSigned := &pb.SignedData{
 		CrxId: hash.Sum(nil)[0:16],
 	}
-	signedHeaderData, err := proto.Marshal(sdpb)
+	signedHeaderData, err := proto.Marshal(pbSigned)
 	if err != nil {
 		return nil, err
 	}

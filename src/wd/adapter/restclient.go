@@ -47,12 +47,12 @@ func (rc *RestClient) Do(req *http.Request) ([]byte, error) {
 	}
 
 	response := &APIResponse{}
-	if err := json.Unmarshal(data, response); err != nil {
+	if err = json.Unmarshal(data, response); err != nil {
 		return nil, err
 	}
 
 	apiError := &APIError{}
-	if err := json.Unmarshal(response.Value, apiError); err == nil && apiError.Error != "" {
+	if err = json.Unmarshal(response.Value, apiError); err == nil && apiError.Error != "" {
 		return nil, errors.New(apiError.Error)
 	}
 
