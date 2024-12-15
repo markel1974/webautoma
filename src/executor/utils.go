@@ -21,7 +21,7 @@ func computeFileId(filename string) string {
 		pos++
 	}
 	name := filename[pos:]
-	if pos := strings.LastIndex(name, "."); pos >= 0 {
+	if pos = strings.LastIndex(name, "."); pos >= 0 {
 		name = name[0:pos]
 	}
 	return name
