@@ -131,7 +131,7 @@ func main() {
 	var buildAsset string
 	var imgDump bool
 	var listen string
-	var console bool
+	var sam bool
 
 	//wd.Example3()
 
@@ -151,7 +151,7 @@ func main() {
 	flag.StringVar(&listen, "y", "", "server listen")
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
 	flag.BoolVar(&imgDump, "a", false, "image dump")
-	flag.BoolVar(&console, "e", false, "launch SAM console")
+	flag.BoolVar(&sam, "e", false, "launch SAM console")
 
 	flag.Parse()
 
@@ -233,7 +233,7 @@ func main() {
 		counter := -1
 		for scanner.Scan() {
 			counter++
-			if err := launch(console, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, scanner.Text()); err != nil {
+			if err := launch(sam, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, scanner.Text()); err != nil {
 				log.Printf("line %d: %s", counter, err.Error())
 			}
 		}
@@ -241,7 +241,7 @@ func main() {
 			log.Printf("line %d: %s", counter, err.Error())
 		}
 	} else {
-		if err = launch(console, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, variables); err != nil {
+		if err = launch(sam, wdUrl, args, sideFile, resultFile, imgFile, imgDump, capture, variables); err != nil {
 			log.Fatal(err.Error())
 		}
 	}

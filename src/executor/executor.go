@@ -573,15 +573,33 @@ func (e *Executor) doStatus(cmd ConfigCommand) error {
 	return nil
 }
 
-func (e *Executor) doGetCookie(target string, id string) error {
-	v, _ := e.adapter.GetCookie(target)
+func (e *Executor) doGetCookie(target string, id string, value string) error {
+	v, err := e.adapter.GetCookie(target)
+	if err != nil {
+		return err
+	}
+	if len(value) > 0 {
+		if err = os.WriteFile(value, []byte(v), 0644); err != nil {
+			return err
+		}
+		return nil
+	}
 	fmt.Printf("%s Cookie =>\n", id)
 	fmt.Println(v)
 	return nil
 }
 
-func (e *Executor) doGetAllCookies(id string) error {
-	v, _ := e.adapter.GetCookies()
+func (e *Executor) doGetAllCookies(id string, value string) error {
+	v, err := e.adapter.GetCookies()
+	if err != nil {
+		return err
+	}
+	if len(value) > 0 {
+		if err = os.WriteFile(value, []byte(v), 0644); err != nil {
+			return err
+		}
+		return nil
+	}
 	fmt.Printf("%s Cookies =>\n", id)
 	fmt.Println(v)
 	return nil
@@ -854,9 +872,9 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "pageSource":
 		err = e.doPageSource(id)
 	case "getAllCookies":
-		err = e.doGetAllCookies(id)
+		err = e.doGetAllCookies(id, value)
 	case "getCookie":
-		err = e.doGetCookie(target, id)
+		err = e.doGetCookie(target, id, value)
 	case "deleteAllCookies":
 		err = e.doDeleteAllCookies()
 	case "deleteCookie":
