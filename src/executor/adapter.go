@@ -8,6 +8,7 @@ import (
 	"github.com/markel1974/webautoma/src/wd/base"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -291,6 +292,18 @@ func (e *Adapter) GetCookies(mode string) (string, error) {
 	})
 }
 
+func (e *Adapter) GetCookiesHttp() ([]*http.Cookie, error) {
+	cookies, err := e.driver.GetCookies()
+	if err != nil {
+		return nil, err
+	}
+	var out []*http.Cookie
+	for _, c := range cookies {
+		out = append(out, c.Http())
+	}
+	return out, nil
+}
+
 func (e *Adapter) KeyDown(keys string) error {
 	return e.tester(e.wait, func() error { return e.driver.KeyDown(keys) })
 }
@@ -347,6 +360,30 @@ func (e *Adapter) FindElementReady(by string, data string, until int) base.IWebE
 		e.RetryWait()
 	}
 	return elem
+}
+
+func (e *Adapter) FindAttribute(by string, data string, attribute string) (string, error) {
+	var err error = nil
+	var val string
+	var elm base.IWebElement = nil
+	var start = UnixMilli(time.Now())
+	for UnixMilli(time.Now())-start < int64(e.wait) {
+		if elm == nil || err != nil {
+			if elm, _ = e._findElementReady(by, data, 2); elm == nil {
+				err = fmt.Errorf("element isn't ready")
+			} else {
+				err = nil
+			}
+		}
+		if elm != nil {
+			val, err = elm.GetAttribute(attribute)
+		}
+		if err == nil {
+			break
+		}
+		e.RetryWait()
+	}
+	return val, err
 }
 
 func (e *Adapter) SendKeys(by string, data string, value string) error {

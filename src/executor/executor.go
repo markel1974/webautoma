@@ -3,6 +3,7 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -42,20 +43,22 @@ type Executor struct {
 	baseUrl      string
 	sam          *SamConsole
 	downloadPath string
+	downloader   *Downloader
 }
 
 func New(driver base.IWebDriver) *Executor {
 	e := &Executor{
-		templates: nil,
-		quit:      false,
-		maxRetry:  3,
-		timers:    make(map[string]*Timer),
-		stack:     nil,
-		adapter:   NewAdapter(driver),
-		execId:    "",
-		lastFrame: nil,
-		baseUrl:   "",
-		sam:       nil,
+		templates:  nil,
+		quit:       false,
+		maxRetry:   3,
+		timers:     make(map[string]*Timer),
+		stack:      nil,
+		adapter:    NewAdapter(driver),
+		execId:     "",
+		lastFrame:  nil,
+		baseUrl:    "",
+		sam:        nil,
+		downloader: NewDownloader(&http.Client{}),
 	}
 	downloadPath, err := os.UserHomeDir()
 	if err == nil {
@@ -132,10 +135,6 @@ func (e *Executor) loadUrl(url string) error {
 	return nil
 }
 
-func (e *Executor) doScreenshot(screenshotId string) error {
-	return e.adapter.Screenshot(screenshotId)
-}
-
 func (e *Executor) computeScroll(value string) (int, []string, int) {
 	var coords []string
 	step := 0
@@ -184,6 +183,10 @@ func (e *Executor) computeSelector(target string) (string, string, error) {
 	return by, data, nil
 }
 
+func (e *Executor) doScreenshot(screenshotId string) error {
+	return e.adapter.Screenshot(screenshotId)
+}
+
 func (e *Executor) doTimer(target string, until string, value string) error {
 	switch until {
 	case "timerCreate":
@@ -223,7 +226,29 @@ func (e *Executor) doMouse(target string, command string, value string) error {
 	if err != nil {
 		return err
 	}
-	return e.adapter.MouseActions(by, data, command, value)
+	if err = e.adapter.MouseActions(by, data, command, value); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *Executor) doClickDownload(target string, value string) error {
+	by, data, err := e.computeSelector(target)
+	if err != nil {
+		return err
+	}
+	val, err := e.adapter.FindAttribute(by, data, "href")
+	if err != nil {
+		return err
+	}
+	cookies, err := e.adapter.GetCookiesHttp()
+	if err != nil {
+		return err
+	}
+	if err = e.downloader.Do(val, cookies, value); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e *Executor) doType(target string, value string) error {
@@ -811,40 +836,18 @@ func (e *Executor) doNavigate(target string) error {
 }
 
 func (e *Executor) doDownload(target string, value string) error {
-	timeout := 60
-	if len(value) > 0 {
-		t, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid timeout %s", err.Error())
-		}
-		if t < 0 {
-			return fmt.Errorf("invalid timeout")
-		}
-		timeout = t
-	}
 	if strings.HasPrefix(target, "/") {
 		target = e.baseUrl + target
 	}
-	pos := strings.LastIndex(target, "/")
-	if pos < 0 {
-		return fmt.Errorf("invalid target")
-	}
-	filename := target[pos+1:]
-	fp := e.downloadPath + filename
-	_ = os.Remove(fp)
-	if err := e.adapter.Navigate(target); err != nil {
+	cookies, err := e.adapter.GetCookiesHttp()
+	if err != nil {
 		return err
 	}
-	counter := 0
-	for {
-		if _, err := os.Stat(fp); err == nil {
-			return nil
-		}
-		time.Sleep(time.Second)
-		if counter++; counter >= timeout {
-			return fmt.Errorf("timeout")
-		}
+	err = e.downloader.Do(target, cookies, value)
+	if err != nil {
+		return err
 	}
+	return nil
 }
 
 func (e *Executor) commandExec(cmd ConfigCommand) error {
@@ -899,7 +902,9 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "click", "rightClick", "doubleClick", "mouseUpAt", "mouseDownAt", "mouseMultipleMoveAt", "mouseMoveAt", "mouseOver":
 		err = e.doMouse(target, command, value)
 	case "mouseOut":
-		//nothing to do
+	//nothing to do
+	case "clickDownload":
+		err = e.doClickDownload(target, value)
 	case "type":
 		err = e.doType(target, value)
 	case "runScript":

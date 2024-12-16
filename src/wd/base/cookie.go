@@ -3,7 +3,9 @@ package base
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 )
 
 /*
@@ -75,6 +77,30 @@ func (c Cookie) Sanitize() Cookie {
 		HTTPOnly: c.HTTPOnly,
 		SameSite: parseSameSite(c.SameSite),
 	}
+}
+
+func (c Cookie) Http() *http.Cookie {
+	expire, _ := c.Expiry.(uint)
+	sameSite := http.SameSiteDefaultMode
+	switch c.SameSite {
+	case SameSiteNone:
+		sameSite = http.SameSiteNoneMode
+	case SameSiteLax:
+		sameSite = http.SameSiteLaxMode
+	case SameSiteStrict:
+		sameSite = http.SameSiteStrictMode
+	}
+	out := &http.Cookie{
+		Name:     c.Name,
+		Value:    c.Value,
+		Path:     c.Path,
+		Domain:   c.Domain,
+		Secure:   c.Secure,
+		Expires:  time.Unix(int64(expire), 0),
+		HttpOnly: c.HTTPOnly,
+		SameSite: sameSite,
+	}
+	return out
 }
 
 func Cookies2Json(cookies []Cookie) (string, error) {
