@@ -835,7 +835,6 @@ func (e *Executor) doDownload(target string, value string) error {
 	if err := e.adapter.Navigate(target); err != nil {
 		return err
 	}
-	fmt.Println("Trying to download file: " + fp)
 	counter := 0
 	for {
 		if _, err := os.Stat(fp); err == nil {
