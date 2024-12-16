@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -27,19 +28,20 @@ const (
 )
 
 type Executor struct {
-	cfgFile   string
-	start     time.Time
-	quit      bool
-	maxRetry  int
-	timers    map[string]*Timer
-	templates *Templates
-	cfg       Config
-	stack     map[string]interface{}
-	adapter   *Adapter
-	execId    string
-	lastFrame interface{}
-	baseUrl   string
-	sam       *SamConsole
+	cfgFile      string
+	start        time.Time
+	quit         bool
+	maxRetry     int
+	timers       map[string]*Timer
+	templates    *Templates
+	cfg          Config
+	stack        map[string]interface{}
+	adapter      *Adapter
+	execId       string
+	lastFrame    interface{}
+	baseUrl      string
+	sam          *SamConsole
+	downloadPath string
 }
 
 func New(driver base.IWebDriver) *Executor {
@@ -54,6 +56,11 @@ func New(driver base.IWebDriver) *Executor {
 		lastFrame: nil,
 		baseUrl:   "",
 		sam:       nil,
+	}
+	downloadPath, err := os.UserHomeDir()
+	if err == nil {
+		downloadPath = filepath.Join(downloadPath, "Downloads") + string(os.PathSeparator)
+		e.downloadPath = downloadPath
 	}
 	return e
 }
@@ -97,6 +104,9 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	if e.cfg.MaxScreenshotLength != nil {
 		e.adapter.SetMaxScreenshotLength(*e.cfg.MaxScreenshotLength)
 	}
+	if len(e.cfg.DownloadPath) > 0 {
+		e.downloadPath = e.cfg.DownloadPath
+	}
 	if e.cfg.Debug {
 		e.adapter.EnableDebug(true)
 	}
@@ -104,6 +114,10 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 		return err
 	}
 	return nil
+}
+
+func (e *Executor) SetDownloadPath(downloadPath string) {
+	e.downloadPath = downloadPath
 }
 
 func (e *Executor) SetImageSize(w int, h int) {
@@ -796,6 +810,44 @@ func (e *Executor) doNavigate(target string) error {
 	return e.adapter.Navigate(target)
 }
 
+func (e *Executor) doDownload(target string, value string) error {
+	timeout := 60
+	if len(value) > 0 {
+		t, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid timeout %s", err.Error())
+		}
+		if t < 0 {
+			return fmt.Errorf("invalid timeout")
+		}
+		timeout = t
+	}
+	if strings.HasPrefix(target, "/") {
+		target = e.baseUrl + target
+	}
+	pos := strings.LastIndex(target, "/")
+	if pos < 0 {
+		return fmt.Errorf("invalid target")
+	}
+	filename := target[pos+1:]
+	fp := e.downloadPath + filename
+	_ = os.Remove(fp)
+	if err := e.adapter.Navigate(target); err != nil {
+		return err
+	}
+	fmt.Println("Trying to download file: " + fp)
+	counter := 0
+	for {
+		if _, err := os.Stat(fp); err == nil {
+			return nil
+		}
+		time.Sleep(time.Second)
+		if counter++; counter >= timeout {
+			return fmt.Errorf("timeout")
+		}
+	}
+}
+
 func (e *Executor) commandExec(cmd ConfigCommand) error {
 	start := time.Now()
 	var err error
@@ -821,6 +873,8 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 		err = e.doUntil(cmd)
 	case "open":
 		err = e.doNavigate(target)
+	case "download":
+		err = e.doDownload(target, value)
 	case "setWindowSize":
 		err = e.doSetWindowSize(target)
 	case "timerCreate", "timerStart", "timerStop", "timerFinalize":

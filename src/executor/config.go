@@ -27,6 +27,7 @@ type Config struct {
 	HumanWait               *int         `json:"humanWait"`
 	RetryInterval           *int         `json:"retryInterval"`
 	MaxScreenshotLength     *int         `json:"maxScreenshotLength"`
+	DownloadPath            string       `json:"downloadPath"`
 	Quit                    *bool        `json:"quit"`
 	ProfileCapture          []string     `json:"profileCapture"`
 	ProfileSupportedMethods []string     `json:"profileSupportedMethods"`
