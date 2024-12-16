@@ -3,12 +3,13 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/markel1974/webautoma/src/shell"
-	"github.com/markel1974/webautoma/src/shell/cli"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/markel1974/webautoma/src/shell"
+	"github.com/markel1974/webautoma/src/shell/cli"
 )
 
 const (

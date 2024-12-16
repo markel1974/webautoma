@@ -2,10 +2,11 @@ package executor
 
 import (
 	"encoding/json"
-	"github.com/markel1974/webautoma/src/wd/base"
 	"log"
 	"regexp"
 	"strings"
+
+	"github.com/markel1974/webautoma/src/wd/base"
 )
 
 var _supportedMethod = map[string]int{"Network.requestWillBeSent": 0, "Network.responseReceived": 1}

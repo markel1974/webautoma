@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
+	"net/url"
+	"os"
+	"strings"
+
 	"github.com/markel1974/webautoma/src/executor"
 	"github.com/markel1974/webautoma/src/server"
 	"github.com/markel1974/webautoma/src/server/asset"
@@ -15,10 +20,6 @@ import (
 	"github.com/markel1974/webautoma/src/wd"
 	"github.com/markel1974/webautoma/src/wd/base"
 	"github.com/markel1974/webautoma/src/wd/caps/chrome"
-	"log"
-	"net/url"
-	"os"
-	"strings"
 )
 
 //export GOPRIVATE=github.com/markel1974/webautoma

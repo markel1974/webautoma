@@ -3,9 +3,10 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"github.com/markel1974/webautoma/src/wd/base"
 	"strings"
 	"time"
+
+	"github.com/markel1974/webautoma/src/wd/base"
 )
 
 type Window struct {
