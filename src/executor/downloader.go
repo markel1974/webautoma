@@ -8,14 +8,18 @@ import (
 	"os"
 )
 
+// Downloader is a structure that facilitates file downloads using an HTTP client.
+// It manages HTTP requests and handles response processing for file saving.
 type Downloader struct {
 	client *http.Client
 }
 
+// NewDownloader creates and returns a new Downloader instance configured with the provided HTTP client.
 func NewDownloader(client *http.Client) *Downloader {
 	return &Downloader{client: client}
 }
 
+// Do perform an HTTP GET request to the specified link, uses provided cookies, and writes the response to a file.
 func (e *Downloader) Do(link string, cookies []*http.Cookie, fName string) error {
 	if len(link) == 0 {
 		return fmt.Errorf("invalid link")

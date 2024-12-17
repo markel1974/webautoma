@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Event represents a log entry containing metadata, timing, status, and network-related details for a specific operation.
 type Event struct {
 	ProbeId           string                 `json:"probeId"`
 	ThreadName        string                 `json:"thread_name"`
@@ -29,6 +30,8 @@ type Event struct {
 	adapter *Adapter
 }
 
+// NewEvent creates and initializes a new Event instance with the given adapter, id, kind, error, and start time.
+// It populates various event fields such as timestamp, start time, error description, and status.
 func NewEvent(adapter *Adapter, id string, kind string, err error, start time.Time) *Event {
 	errorDesc := ""
 	if err != nil {
@@ -57,6 +60,7 @@ func NewEvent(adapter *Adapter, id string, kind string, err error, start time.Ti
 	return event
 }
 
+// Write updates the Event with a message, execution time, and stop timestamp, then logs the serialized Event data.
 func (e *Event) Write(message string, dur int64) {
 	e.Message = message
 	e.ExecutionTime = dur

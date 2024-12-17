@@ -12,6 +12,20 @@ import (
 	"github.com/markel1974/webautoma/src/shell/cli"
 )
 
+// MessageNext represents the 'next' message command.
+// MessagePrev represents the 'previous' message command.
+// MessageStep represents the 'step' message command.
+// MessageList represents the 'list' message command.
+// MessageRedo represents the 'redo' message command.
+// MessageStop represents the 'stop' message command.
+// MessageRun represents the 'run' message command.
+// MessageEdit represents the 'edit' message command.
+// MessageJump represents the 'jump' message command.
+// MessageCurr represents the 'current' message command.
+// MessagePrintHtml represents the 'print HTML' message command.
+// MessagePrintNet represents the 'print network' message command.
+// MessageWindows represents the 'windows' message command.
+// MessageQuit represents the 'quit' message command.
 const (
 	MessageNext      = 0
 	MessagePrev      = 1
@@ -29,26 +43,33 @@ const (
 	MessageQuit      = 255
 )
 
+// ISamMessage defines an interface for message operations with methods to get type, set, and retrieve responses.
 type ISamMessage interface {
 	GetType() int
 	SetResponse(id string, x int, result string, err error)
 	GetResponse() []string
 }
 
+// SamMessage represents a structured message containing a type identifier and a response channel for communication.
 type SamMessage struct {
 	kind     int
 	response chan []string
 }
 
+// NewSamMessage initializes and returns a pointer to a new SamMessage with the specified kind and an empty response channel.
 func NewSamMessage(kind int) *SamMessage {
 	return &SamMessage{
 		kind:     kind,
 		response: make(chan []string),
 	}
 }
+
+// GetType returns the type of the SamMessage as an integer stored in the 'kind' field.
 func (s *SamMessage) GetType() int {
 	return s.kind
 }
+
+// SetResponse processes the provided result and error, formats the response, and sends it to the response channel.
 func (s *SamMessage) SetResponse(id string, x int, result string, err error) {
 	var out []string
 	var status string
@@ -66,17 +87,21 @@ func (s *SamMessage) SetResponse(id string, x int, result string, err error) {
 	out = append(out, fmt.Sprintf("%s *[%d] -> %s", status, x, id))
 	s.response <- out
 }
+
+// GetResponse retrieves and returns a slice of strings from the response channel of the SamMessage instance.
 func (s *SamMessage) GetResponse() []string {
 	v := <-s.response
 	return v
 }
 
+// SamMessageEdit extends SamMessage to handle message edits with a key-value pair for identification and update.
 type SamMessageEdit struct {
 	*SamMessage
 	key string
 	val string
 }
 
+// NewSamMessageEdit creates and returns a pointer to a new instance of SamMessageEdit with the provided key and value.
 func NewSamMessageEdit(key string, val string) *SamMessageEdit {
 	return &SamMessageEdit{
 		SamMessage: NewSamMessage(MessageEdit),
@@ -84,31 +109,40 @@ func NewSamMessageEdit(key string, val string) *SamMessageEdit {
 		val:        val,
 	}
 }
+
+// KeyVal returns the `key` and `val` fields of the SamMessageEdit instance.
 func (sme *SamMessageEdit) KeyVal() (string, string) {
 	return sme.key, sme.val
 }
 
+// SamMessageJump represents a specialized message type for handling jump-related operations in tests.
+// It embeds SamMessage and includes an integer value indicating a jump position or offset.
 type SamMessageJump struct {
 	*SamMessage
 	jump int
 }
 
+// NewSamMessageJump creates and returns a new SamMessageJump instance with the specified jump value.
 func NewSamMessageJump(jump int) *SamMessageJump {
 	return &SamMessageJump{
 		SamMessage: NewSamMessage(MessageJump),
 		jump:       jump,
 	}
 }
+
+// Jump returns the jump value associated with the SamMessageJump instance.
 func (smj *SamMessageJump) Jump() int {
 	return smj.jump
 }
 
+// SamMessageStep wraps a SamMessage and adds step-specific state like advance flag and step count.
 type SamMessageStep struct {
 	*SamMessage
 	advance bool
 	count   int
 }
 
+// NewSamMessageStep creates and returns a pointer to a SamMessageStep instance with the specified advance and count parameters.
 func NewSamMessageStep(advance bool, count int) *SamMessageStep {
 	return &SamMessageStep{
 		SamMessage: NewSamMessage(MessageStep),
@@ -116,47 +150,63 @@ func NewSamMessageStep(advance bool, count int) *SamMessageStep {
 		count:      count,
 	}
 }
+
+// Advance returns the value of the `advance` field in the SamMessageStep struct. It indicates if step advancement is enabled.
 func (smj *SamMessageStep) Advance() bool {
 	return smj.advance
 }
 
+// SamMessageHTML is used to represent an HTML-specific SamMessage with an associated file identifier.
 type SamMessageHTML struct {
 	*SamMessage
 	fileId string
 }
 
+// NewSamMessageHTML initializes and returns a pointer to a SamMessageHTML with the specified file ID.
+// It creates a new SamMessage with the MessagePrintHtml type and associates it with the given fileId.
 func NewSamMessageHTML(fileId string) *SamMessageHTML {
 	return &SamMessageHTML{
 		SamMessage: NewSamMessage(MessagePrintHtml),
 		fileId:     fileId,
 	}
 }
+
+// FileId returns the fileId string associated with the SamMessageHTML instance.
 func (smj *SamMessageHTML) FileId() string {
 	return smj.fileId
 }
 
+// SamMessageNet represents a specialized SamMessage with an associated file ID for network operations.
 type SamMessageNet struct {
 	*SamMessage
 	fileId string
 }
 
+// NewSamMessageNet initializes and returns a new instance of SamMessageNet with the specified fileId.
 func NewSamMessageNet(fileId string) *SamMessageNet {
 	return &SamMessageNet{
 		SamMessage: NewSamMessage(MessagePrintNet),
 		fileId:     fileId,
 	}
 }
+
+// FileId retrieves the file identifier associated with the SamMessageNet instance.
 func (smj *SamMessageNet) FileId() string {
 	return smj.fileId
 }
 
+// SamMessages represents a channel for transporting ISamMessage instances between components or routines.
 type SamMessages chan ISamMessage
 
+// SamConsole is responsible for managing console interactions and processing commands in a structured environment.
+// It interacts with an Executor for executing and orchestrating commands and messages.
+// It maintains a channel of type SamMessages for communication with external or internal components.
 type SamConsole struct {
 	e        *Executor
 	messages SamMessages
 }
 
+// NewSam initializes a new SamConsole object with the provided Executor and a message channel of size 64.
 func NewSam(e *Executor) *SamConsole {
 	return &SamConsole{
 		e:        e,
@@ -164,6 +214,7 @@ func NewSam(e *Executor) *SamConsole {
 	}
 }
 
+// Start initializes the console, creates necessary resources, and starts the event loop to process commands.
 func (sm *SamConsole) Start() error {
 	quit := make(chan bool)
 	if err := shell.Create(false, sm.commandHandler(), quit); err != nil {
@@ -173,12 +224,14 @@ func (sm *SamConsole) Start() error {
 	return nil
 }
 
+// Print replaces line endings in the input string and prints it to the console with a preceding newline.
 func (sm *SamConsole) Print(s string) {
 	s = strings.Replace(s, "\r\n", "\n", -1)
 	s = strings.Replace(s, "\n", "\r\n", -1)
 	fmt.Printf("\r\n%s", s)
 }
 
+// runCommand executes a CLI command, sends a message, retrieves a response, and deactivates the process by its ID.
 func (sm *SamConsole) runCommand(cmd *cli.Command, pid int, s ISamMessage) {
 	fmt.Printf("\r\n%s", "waiting....")
 	r := cmd.GetRootContext()
@@ -189,10 +242,12 @@ func (sm *SamConsole) runCommand(cmd *cli.Command, pid int, s ISamMessage) {
 	r.Deactivate(pid)
 }
 
+// SendMessage sends a message to the SamConsole by pushing it into the messages channel.
 func (sm *SamConsole) SendMessage(m ISamMessage) {
 	sm.messages <- m
 }
 
+// eventLoop manages the main message processing loop, handling various message types and commands for SamConsole.
 func (sm *SamConsole) eventLoop(quit chan bool) {
 	test := sm.e.cfg.Tests[0]
 	pc := 0
@@ -284,6 +339,7 @@ func (sm *SamConsole) eventLoop(quit chan bool) {
 	}
 }
 
+// commandHandler initializes and returns the root command with its subcommands for handling various console operations.
 func (sm *SamConsole) commandHandler() *cli.Command {
 	root := cli.NewCommand()
 	root.Run = func(cmd *cli.Command, pid int, args []string) {}
@@ -490,6 +546,9 @@ func (sm *SamConsole) commandHandler() *cli.Command {
 	return root
 }
 
+// AlterObject modifies the referenced object's field specified by key (k) with the provided value (v).
+// The operation adapts to the field's data type and requires the object parameter (cmd) to be a pointer.
+// Returns an error if the operation fails, including unsupported types or parsing errors.
 func AlterObject(k string, v string, cmd interface{}) error {
 	rv := reflect.ValueOf(cmd)
 	trv := reflect.TypeOf(cmd)

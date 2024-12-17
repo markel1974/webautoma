@@ -7,6 +7,9 @@ import (
 	"image/png"
 )
 
+// AspectRatio adjusts the width and height to maintain the original aspect ratio within the target dimensions.
+// Returns the new width and height as integers.
+// If the source height is zero or less, the target width is used for both dimensions.
 func AspectRatio(srcW int, srcH int, targetW int, targetH int) (int, int) {
 	if srcH <= 0 {
 		return targetW, targetW
@@ -17,6 +20,9 @@ func AspectRatio(srcW int, srcH int, targetW int, targetH int) (int, int) {
 	return int(widthT), int(heightT)
 }
 
+// Scale resizes an input image to the specified dimensions, optionally preserving the aspect ratio if enabled.
+// buf is the image data to be scaled, x1 and y1 define the target width and height, and aspectRatio determines scaling behavior.
+// Returns the scaled image as a PNG-encoded byte slice or an error if the operation fails.
 func Scale(buf []byte, x1 int, y1 int, aspectRatio bool) ([]byte, error) {
 	reader := bytes.NewReader(buf)
 	img, _, err := image.Decode(reader)
@@ -45,6 +51,7 @@ func Scale(buf []byte, x1 int, y1 int, aspectRatio bool) ([]byte, error) {
 	return writer.Bytes(), nil
 }
 
+// scaleTo scales the source image to fit within the specified rectangle using the provided scaling algorithm.
 func scaleTo(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image {
 	dst := image.NewRGBA(rect)
 	scale.Scale(dst, rect, src, src.Bounds(), draw.Over, nil)

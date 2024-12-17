@@ -13,21 +13,28 @@ import (
 	"github.com/markel1974/webautoma/src/wd/base"
 )
 
+// RequiredLogs returns the log type and log level required for performance monitoring and debugging purposes.
 func RequiredLogs() (base.LogType, base.LogLevel) {
 	return base.LogPerformance, base.LogAll
 }
 
+// eventMessageOK represents a message indicating the success of a probe.
+// eventMessageNOK represents a message indicating an error occurred in the probe.
+// eventMessageTimerNotFinalized indicates that the timer operation was not finalized.
 const (
 	eventMessageOK                = "Esito sonda ok"
 	eventMessageNOK               = "Errore nella sonda"
 	eventMessageTimerNotFinalized = "timer not finalized"
 )
 
+// Event kind constants represent different types of events: full or intermediate.
 const (
 	eventKindFull         = "full"
 	eventKindIntermediate = "intermediate"
 )
 
+// Executor is a type that manages execution context and orchestrates components like templates, timers, and file downloads.
+// It handles configuration, state management, and interactions with the SamConsole and Downloader.
 type Executor struct {
 	cfgFile      string
 	start        time.Time
@@ -46,6 +53,7 @@ type Executor struct {
 	downloader   *Downloader
 }
 
+// New initializes and returns a new Executor instance configured with the provided IWebDriver.
 func New(driver base.IWebDriver) *Executor {
 	e := &Executor{
 		templates:  nil,
@@ -68,6 +76,7 @@ func New(driver base.IWebDriver) *Executor {
 	return e
 }
 
+// Setup initializes the executor with configuration, templates, and adapter settings based on provided parameters.
 func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDump bool, profileCapture []string, variables map[string]interface{}) error {
 	var err error
 	e.execId = computeFileId(sideFile)
@@ -119,14 +128,17 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	return nil
 }
 
+// SetDownloadPath sets the file download path for the Executor to the specified directory.
 func (e *Executor) SetDownloadPath(downloadPath string) {
 	e.downloadPath = downloadPath
 }
 
+// SetImageSize sets the width and height of the image using the provided dimensions (w for width, h for height).
 func (e *Executor) SetImageSize(w int, h int) {
 	e.adapter.SetImageSize(w, h)
 }
 
+// loadUrl navigates to the specified URL using the adapter and updates the base URL in the Executor. It returns any error.
 func (e *Executor) loadUrl(url string) error {
 	if err := e.adapter.Navigate(url); err != nil {
 		return err
@@ -135,6 +147,7 @@ func (e *Executor) loadUrl(url string) error {
 	return nil
 }
 
+// computeScroll parses the scroll value, extracting scroll coordinates, step count, and interval from the input string.
 func (e *Executor) computeScroll(value string) (int, []string, int) {
 	var coords []string
 	step := 0
@@ -156,6 +169,7 @@ func (e *Executor) computeScroll(value string) (int, []string, int) {
 	return step, coords, interval
 }
 
+// computeSelector parses the target, determines the selection strategy, and returns the strategy, value, or an error.
 func (e *Executor) computeSelector(target string) (string, string, error) {
 	var container = strings.Split(target, "=")
 	if len(container) <= 1 {
@@ -183,10 +197,16 @@ func (e *Executor) computeSelector(target string) (string, string, error) {
 	return by, data, nil
 }
 
+// doScreenshot captures a screenshot using the provided screenshot ID and delegates the operation to the adapter.
 func (e *Executor) doScreenshot(screenshotId string) error {
 	return e.adapter.Screenshot(screenshotId)
 }
 
+// doTimer handles the creation, starting, stopping, and finalization of timers based on the provided action parameters.
+// target specifies the timer identifier.
+// until determines the operation to perform: "timerCreate", "timerStart", "timerStop", or "timerFinalize".
+// value provides additional context or settings for the operation, such as finalization instructions.
+// Returns an error if the timer operation fails or if the provided target is unrecognized.
 func (e *Executor) doTimer(target string, until string, value string) error {
 	switch until {
 	case "timerCreate":
@@ -221,6 +241,9 @@ func (e *Executor) doTimer(target string, until string, value string) error {
 	return nil
 }
 
+// doMouse performs mouse-related actions on a target element using the specified command and value.
+// It computes the element's selector and applies the necessary mouse action through the adapter.
+// Returns an error if the selector computation or mouse action execution fails.
 func (e *Executor) doMouse(target string, command string, value string) error {
 	by, data, err := e.computeSelector(target)
 	if err != nil {
@@ -232,6 +255,9 @@ func (e *Executor) doMouse(target string, command string, value string) error {
 	return nil
 }
 
+// doClickDownload downloads a file by finding the "href" attribute of an element and performing an HTTP request.
+// target specifies the selector of the element; value specifies the file name for saving the download.
+// Returns an error if the operation fails at any stage: selector computation, attribute retrieval, or download.
 func (e *Executor) doClickDownload(target string, value string) error {
 	by, data, err := e.computeSelector(target)
 	if err != nil {
@@ -251,6 +277,8 @@ func (e *Executor) doClickDownload(target string, value string) error {
 	return nil
 }
 
+// doType types a sequence of characters into a target element or sends individual keystrokes, with optional delays.
+// Returns an error if the operation fails due to an invalid target, selector computation issue, or keystroke failure.
 func (e *Executor) doType(target string, value string) error {
 	if len(value) <= 0 {
 		return nil
@@ -271,10 +299,14 @@ func (e *Executor) doType(target string, value string) error {
 	return nil
 }
 
+// doRunScript executes the given script with specified arguments using the adapter and returns any resulting errors.
 func (e *Executor) doRunScript(script string, args []interface{}) error {
 	return e.adapter.ExecuteScript(script, args)
 }
 
+// doSelectFrame switches the execution context to a specified frame based on the given target string.
+// The target string can specify the frame by index, relative name, or other identifiers.
+// Returns an error if the target cannot be parsed or the frame switch fails.
 func (e *Executor) doSelectFrame(target string) error {
 	var frame interface{}
 	if v := strings.Split(target, "="); len(v) >= 2 {
@@ -299,15 +331,18 @@ func (e *Executor) doSelectFrame(target string) error {
 	return e.adapter.SwitchFrame(frame)
 }
 
+// doSelectParentFrame switches to the parent frame of the current frame and resets the lastFrame field to nil.
 func (e *Executor) doSelectParentFrame() error {
 	e.lastFrame = nil
 	return e.adapter.SwitchParentFrame()
 }
 
+// doSelectWindowMain switches the context to the main application window and interacts with the adapter to perform the operation.
 func (e *Executor) doSelectWindowMain() error {
 	return e.adapter.SelectWindowMain()
 }
 
+// doListWindows retrieves the titles of all browser windows and returns them as a slice of strings.
 func (e *Executor) doListWindows() ([]string, error) {
 	var out []string
 	currentWindow, err := e.adapter.CurrentWindowHandle()
@@ -332,6 +367,7 @@ func (e *Executor) doListWindows() ([]string, error) {
 	return out, nil
 }
 
+// doSelectWindowTitle switches to a browser window by its title. Returns an error if no such window is found.
 func (e *Executor) doSelectWindowTitle(title string) error {
 	currentWindow, err := e.adapter.CurrentWindowHandle()
 	if err != nil {
@@ -367,6 +403,8 @@ func (e *Executor) doSelectWindowTitle(title string) error {
 	return nil
 }
 
+// doSelectAlert processes an alert dialog based on the input value: accepts, dismisses, or performs no action.
+// Returns an error if the alert interaction or parsing fails.
 func (e *Executor) doSelectAlert(val string) error {
 	value := parseInt(val)
 	_, err := e.adapter.AlertText()
@@ -389,6 +427,7 @@ func (e *Executor) doSelectAlert(val string) error {
 	return nil
 }
 
+// doCloseWindow closes the current browser window unless it is the root window, switching back to the root window afterward.
 func (e *Executor) doCloseWindow() error {
 	currentWindow, err := e.adapter.CurrentWindowHandle()
 	if err != nil {
@@ -404,6 +443,7 @@ func (e *Executor) doCloseWindow() error {
 	return nil
 }
 
+// doClose closes a window identified by the target in the provided ConfigCommand. Returns error if the handle is invalid.
 func (e *Executor) doClose(cmd ConfigCommand) error {
 	target := cmd.Target
 	handle, err := e.adapter.GetWindowHandle(target)
@@ -416,6 +456,11 @@ func (e *Executor) doClose(cmd ConfigCommand) error {
 	return nil
 }
 
+// doStackAdd adds an element's properties to the execution stack under the specified id if the element is found.
+// id specifies the key to store the element data in the stack.
+// target is the selector to locate the element.
+// u is a conditional string that determines wait behavior. If non-empty, readiness is awaited before detection.
+// Returns an error if the element cannot be located or any other issue arises during processing.
 func (e *Executor) doStackAdd(id string, target string, u string) error {
 	until := 0
 	if len(u) > 0 {
@@ -440,17 +485,20 @@ func (e *Executor) doStackAdd(id string, target string, u string) error {
 	return nil
 }
 
+// doStackPrint serializes the stack data into an indented JSON format and prints it to the standard output. Returns an error.
 func (e *Executor) doStackPrint() error {
 	k, _ := json.MarshalIndent(e.stack, "", "	")
 	fmt.Println(string(k))
 	return nil
 }
 
+// doStackReset clears the Executor's stack by setting it to nil and returns any error that occurs.
 func (e *Executor) doStackReset() error {
 	e.stack = nil
 	return nil
 }
 
+// doAssert verifies if the text of the found element matches the given caption and returns an error if they differ or fail.
 func (e *Executor) doAssert(target string, u string, caption string) error {
 	until := 0
 	if len(u) > 0 {
@@ -474,6 +522,8 @@ func (e *Executor) doAssert(target string, u string, caption string) error {
 	return nil
 }
 
+// doExists verifies if the specified element exists on the page based on the provided target and condition parameters.
+// Returns an error if the element is not found or if there is an issue during the operation.
 func (e *Executor) doExists(target string, u string) error {
 	until := 0
 	if len(u) > 0 {
@@ -489,6 +539,7 @@ func (e *Executor) doExists(target string, u string) error {
 	return nil
 }
 
+// doUntil executes a command until a specific condition is evaluated, using the provided ConfigCommand parameters.
 func (e *Executor) doUntil(cmd ConfigCommand) error {
 	target := cmd.Target
 	u := cmd.Until
@@ -506,6 +557,8 @@ func (e *Executor) doUntil(cmd ConfigCommand) error {
 	return nil
 }
 
+// doSelectWindow switches to the window identified by the given target string, using the adapter's window handling API.
+// Returns an error if the window cannot be found or if switching to the window fails.
 func (e *Executor) doSelectWindow(target string) error {
 	handle, err := e.adapter.GetWindowHandle(target)
 	if err != nil {
@@ -517,11 +570,14 @@ func (e *Executor) doSelectWindow(target string) error {
 	return nil
 }
 
+// doStoreWindowHandle stores the current window handle using the provided target string from the command configuration.
 func (e *Executor) doStoreWindowHandle(cmd ConfigCommand) error {
 	target := cmd.Target
 	return e.adapter.StoreWindowHandle(target)
 }
 
+// doSelect attempts to select an option from a dropdown element based on its label and provided target and value inputs.
+// Returns an error if the input is invalid, no matching option is found, or interaction with the element fails.
 func (e *Executor) doSelect(target string, value string) error {
 	v := strings.Split(value, "=")
 	if len(v) < 2 {
@@ -556,6 +612,7 @@ func (e *Executor) doSelect(target string, value string) error {
 	return fmt.Errorf("not found")
 }
 
+// doActiveElement retrieves the currently active element using the adapter and prints its details with a given identifier.
 func (e *Executor) doActiveElement(id string) error {
 	elm, err := e.adapter.ActiveElement()
 	if err != nil {
@@ -566,6 +623,7 @@ func (e *Executor) doActiveElement(id string) error {
 	return nil
 }
 
+// doWindowHandles retrieves and prints the current window handles, associating them with the provided id.
 func (e *Executor) doWindowHandles(id string) error {
 	fmt.Printf("%s WindowHandles =>\n", id)
 	v, _ := e.adapter.WindowHandles()
@@ -573,6 +631,8 @@ func (e *Executor) doWindowHandles(id string) error {
 	return nil
 }
 
+// doPause pauses execution for a duration specified in the Target field of the given ConfigCommand.
+// Returns an error if Target cannot be converted to an integer or if any other issue occurs during execution.
 func (e *Executor) doPause(cmd ConfigCommand) error {
 	target := cmd.Target
 	v, err := strconv.Atoi(target)
@@ -583,20 +643,24 @@ func (e *Executor) doPause(cmd ConfigCommand) error {
 	return nil
 }
 
+// doSetTimeout sets a timeout value by parsing the input string and updating the internal adapter wait configuration.
 func (e *Executor) doSetTimeout(value string) error {
 	e.adapter.SetWait(parseInt(value))
 	return nil
 }
 
+// doRetrieveNetworkHeaders retrieves network headers via the adapter and returns them as a string along with any error.
 func (e *Executor) doRetrieveNetworkHeaders() (string, error) {
 	return e.adapter.NetworkHeaders()
 }
 
+// doRetrievePageSource retrieves the page source using the adapter and returns it along with any potential error.
 func (e *Executor) doRetrievePageSource() (string, error) {
 	v, err := e.adapter.PageSource()
 	return v, err
 }
 
+// doPageSource retrieves the current page source via the adapter and prints it along with the provided identifier.
 func (e *Executor) doPageSource(id string) error {
 	v, _ := e.adapter.PageSource()
 	fmt.Printf("%s PageSource =>\n", id)
@@ -604,6 +668,7 @@ func (e *Executor) doPageSource(id string) error {
 	return nil
 }
 
+// doStatus retrieves and prints the current status from the adapter, associating it with the provided command ID.
 func (e *Executor) doStatus(cmd ConfigCommand) error {
 	id := cmd.Id
 	fmt.Printf("%s Status =>\n", id)
@@ -612,6 +677,9 @@ func (e *Executor) doStatus(cmd ConfigCommand) error {
 	return nil
 }
 
+// doGetCookie retrieves a cookie value based on the target specifications and optionally saves it to a file.
+// It uses the adapter's GetCookie method and can output the result to the console or a file based on the value parameter.
+// Returns an error if there are issues in retrieving or saving the cookie.
 func (e *Executor) doGetCookie(target string, id string, value string) error {
 	mode := ""
 	name := target
@@ -635,6 +703,7 @@ func (e *Executor) doGetCookie(target string, id string, value string) error {
 	return nil
 }
 
+// doGetAllCookies retrieves all cookies for a specified target and writes them to a file or outputs them to the console.
 func (e *Executor) doGetAllCookies(target string, id string, value string) error {
 	mode := target
 	v, err := e.adapter.GetCookies(mode)
@@ -652,14 +721,18 @@ func (e *Executor) doGetAllCookies(target string, id string, value string) error
 	return nil
 }
 
+// doDeleteAllCookies removes all cookies stored in the current browser session and returns an error if it fails.
 func (e *Executor) doDeleteAllCookies() error {
 	return e.adapter.DeleteAllCookies()
 }
 
+// doDeleteCookie removes a specific browser cookie identified by the target string.
+// It returns an error if the operation fails.
 func (e *Executor) doDeleteCookie(target string) error {
 	return e.adapter.DeleteCookie(target)
 }
 
+// doActionsSendKeys simulates sending a sequence of key presses defined by the specified value using the adapter interface.
 func (e *Executor) doActionsSendKeys(value string) error {
 	//TODO TEST
 	//for x := 0; x < 100; x++ {
@@ -671,47 +744,57 @@ func (e *Executor) doActionsSendKeys(value string) error {
 	return e.adapter.KeyDown(value)
 }
 
+// doSetWindowMain sets the root window as the primary window for the current session using the adapter.
 func (e *Executor) doSetWindowMain() error {
 	return e.adapter.SetRootWindow()
 }
 
+// doHumanWait causes a delay by parsing the given string value as an integer and invoking the adapter's Sleep method.
 func (e *Executor) doHumanWait(value string) error {
 	e.adapter.Sleep(parseInt(value))
 	return nil
 }
 
+// doEnableDebug enables the debug mode by configuring the adapter to allow detailed debugging information.
 func (e *Executor) doEnableDebug() error {
 	e.adapter.EnableDebug(true)
 	return nil
 }
 
+// doDisableDebug disables the debug mode in the adapter by setting the debug flag to false.
 func (e *Executor) doDisableDebug() error {
 	e.adapter.EnableDebug(false)
 	return nil
 }
 
+// doDisableError disables error handling for the associated adapter and returns any error encountered during the process.
 func (e *Executor) doDisableError() error {
 	e.adapter.SetErrorDisabled(true)
 	return nil
 }
 
+// doEnableError enables error handling by setting the adapter's error state to not disabled. Returns an error if any issue occurs.
 func (e *Executor) doEnableError() error {
 	e.adapter.SetErrorDisabled(false)
 	return nil
 }
 
+// doExecId sets the Executor's execId field to the target value from the provided ConfigCommand. Returns an error if any.
 func (e *Executor) doExecId(cmd ConfigCommand) error {
 	target := cmd.Target
 	e.execId = target
 	return nil
 }
 
+// doProbeId sets the probe ID for the provided target using the adapter in the Executor. Returns an error if the operation fails.
 func (e *Executor) doProbeId(cmd ConfigCommand) error {
 	target := cmd.Target
 	e.adapter.SetProbeId(target)
 	return nil
 }
 
+// doSetWindowSize adjusts the window size based on the target string input formatted as "widthxheight".
+// Returns an error if the input format is invalid or resizing fails.
 func (e *Executor) doSetWindowSize(target string) error {
 	v := strings.Split(target, "x")
 	if len(v) < 2 {
@@ -722,6 +805,9 @@ func (e *Executor) doSetWindowSize(target string) error {
 	return e.adapter.ResizeWindow("", width, height)
 }
 
+// doScroll performs a scroll action based on the provided command configuration, including offsets and element location.
+// It calculates the scroll steps, coordinates, and interval, executing the scroll in steps if required.
+// Returns an error if the configuration is invalid, the target element is not ready, or the adapter scroll operation fails.
 func (e *Executor) doScroll(cmd ConfigCommand) error {
 	value := cmd.Value
 	target := cmd.Target
@@ -778,6 +864,7 @@ func (e *Executor) doScroll(cmd ConfigCommand) error {
 
 }
 
+// doScrollTo performs a smooth scrolling operation to a specified target element or coordinates with adjustable steps and interval.
 func (e *Executor) doScrollTo(cmd ConfigCommand) error {
 	value := cmd.Value
 	target := cmd.Target
@@ -828,6 +915,8 @@ func (e *Executor) doScrollTo(cmd ConfigCommand) error {
 	return nil
 }
 
+// doNavigate constructs a full URL if the target is relative and navigates to the specified target using the adapter.
+// Returns an error if the navigation operation fails.
 func (e *Executor) doNavigate(target string) error {
 	if strings.HasPrefix(target, "/") {
 		target = e.baseUrl + target
@@ -835,6 +924,10 @@ func (e *Executor) doNavigate(target string) error {
 	return e.adapter.Navigate(target)
 }
 
+// doDownload performs a file download by constructing the full target URL, retrieving cookies, and invoking the downloader.
+// target specifies the file's URL path or endpoint.
+// value is the filename or destination for the downloaded file.
+// Returns an error if URL construction, cookie retrieval, or download process fails.
 func (e *Executor) doDownload(target string, value string) error {
 	if strings.HasPrefix(target, "/") {
 		target = e.baseUrl + target
@@ -850,6 +943,9 @@ func (e *Executor) doDownload(target string, value string) error {
 	return nil
 }
 
+// commandExec executes a given ConfigCommand using Executor's adapter and specified logic for diverse command types.
+// It performs various browser or system-related actions based on the command type, target, and additional parameters.
+// Returns an error if the command execution fails or is unimplemented.
 func (e *Executor) commandExec(cmd ConfigCommand) error {
 	start := time.Now()
 	var err error
@@ -980,6 +1076,7 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	return err
 }
 
+// finalize ensures all timers associated with the executor are finalized and logs the operation's result and duration.
 func (e *Executor) finalize(err error) {
 	for _, t := range e.timers {
 		if !t.Finalized {
@@ -999,6 +1096,8 @@ func (e *Executor) finalize(err error) {
 	}
 }
 
+// doComputeJump finds the index of the target command in the commands list based on the given target ID.
+// Returns the index if found, or -1 with an error if the target is not found or is empty.
 func (e *Executor) doComputeJump(target string, commands []ConfigCommand) (int, error) {
 	if len(target) == 0 {
 		return -1, fmt.Errorf("empty target")
@@ -1011,6 +1110,7 @@ func (e *Executor) doComputeJump(target string, commands []ConfigCommand) (int, 
 	return -1, fmt.Errorf("undefined id: " + target)
 }
 
+// doCommand executes a specified command from the given list at the provided index and returns its result or error.
 func (e *Executor) doCommand(commands []ConfigCommand, idx int) (string, int, error) {
 	if idx >= len(commands) {
 		return "", -1, fmt.Errorf("invalid index %d", idx)
@@ -1073,6 +1173,7 @@ func (e *Executor) doCommand(commands []ConfigCommand, idx int) (string, int, er
 	return "", jump, err
 }
 
+// commandsLoop iterates through test commands and executes them, handling jumps and errors during execution.
 func (e *Executor) commandsLoop() (string, error) {
 	for _, test := range e.cfg.Tests {
 		for x := 0; x < len(test.Commands); x++ {
@@ -1088,6 +1189,9 @@ func (e *Executor) commandsLoop() (string, error) {
 	return "", nil
 }
 
+// Start initializes and begins execution of the Executor with optional SAM mode based on the input parameter.
+// It performs setup actions such as logging, applying templates, loading URLs, and starting the command loop or SAM.
+// Returns an error if initialization or execution encounters failures.
 func (e *Executor) Start(sam bool) error {
 	e.start = time.Now()
 	e.adapter.log(LogLevelInfo, "Sample started")
@@ -1122,6 +1226,7 @@ func (e *Executor) Start(sam bool) error {
 	return nil
 }
 
+// SamSendMessage sends an ISamMessage instance to the configured SamConsole if it is not nil.
 func (e *Executor) SamSendMessage(s ISamMessage) {
 	if e.sam == nil {
 		return
