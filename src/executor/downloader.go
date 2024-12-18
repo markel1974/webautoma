@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 )
 
 // Downloader is a structure that facilitates file downloads using an HTTP client.
@@ -51,6 +52,20 @@ func (e *Downloader) Do(link string, cookies []*http.Cookie, fName string) error
 	_, err = io.Copy(out, res.Body)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+const _r = `<\s*a\s+href\s*=\s*"([^"]+)"`
+
+var _rgx = regexp.MustCompile(_r)
+
+func (e *Downloader) DoRetrieveHref(cookies []*http.Cookie, html string, pattern string) error {
+	values := _rgx.FindAllStringSubmatch(html, -1)
+	for _, v := range values {
+		if len(v) > 1 {
+			fmt.Println(v[1])
+		}
 	}
 	return nil
 }

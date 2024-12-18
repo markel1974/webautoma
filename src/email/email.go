@@ -1,14 +1,14 @@
 package email
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message/mail"
 	"io"
-	"log"
 	"regexp"
+	"strings"
+	"time"
 )
 
 //https://github.com/emersion/go-imap/blob/v2/imapclient/example_test.go
@@ -36,28 +36,66 @@ func (m Mode) String() string {
 }
 
 type Client struct {
-	mode       Mode
-	server     string
-	user       string
-	password   string
-	folder     string
-	options    *imapclient.Options
-	subjectRgx *regexp.Regexp
-	bodyRgx    *regexp.Regexp
+	mode      Mode
+	server    string
+	user      string
+	password  string
+	folder    string
+	options   *imapclient.Options
+	useOAuth2 bool
 }
 
-func NewClient(server string, user string, password string, mode Mode) *Client {
-	subjectRgx := regexp.MustCompile("test .*")
-	bodyRgx := regexp.MustCompile("<beta>([^>]+)<beta>")
+func NewClientFromTarget(target string) (*Client, error) {
+	const protoSep = "://"
+	const serverSep = "@"
+	const userSep = ":"
+	const oauth2Mode = "[oauth2]"
+	pos := strings.LastIndex(target, serverSep)
+	if pos <= 0 {
+		return nil, fmt.Errorf("invalid target, missing server section")
+	}
+	p1 := target[:pos]
+	server := target[pos+len(serverSep):]
+	pos = strings.Index(target, protoSep)
+	if pos <= 0 {
+		return nil, fmt.Errorf("invalid target, missing protocol section")
+	}
+	k := p1[:pos]
+	p2 := p1[pos+len(protoSep):]
+	pos = strings.Index(p2, userSep)
+	if pos <= 0 {
+		return nil, fmt.Errorf("invalid target, missing user section")
+	}
+	user := p2[:pos]
+	password := p2[pos+len(userSep):]
+	mode := ModeTLS
+	useAuth := false
+	if strings.Contains(k, oauth2Mode) {
+		k = strings.Replace(k, oauth2Mode, "", -1)
+		useAuth = true
+	}
+	switch strings.ToLower(k) {
+	case "insecure":
+		mode = ModeInsecure
+	case "starttls":
+		mode = ModeStartTLS
+	case "tls":
+		mode = ModeTLS
+	default:
+		return nil, fmt.Errorf("invalid target, unknown mode %s", k)
+	}
+	return NewClient(server, user, password, mode, useAuth), nil
+}
+
+func NewClient(server string, user string, password string, mode Mode, useOAuth2 bool) *Client {
 	return &Client{
-		server:     server,
-		user:       user,
-		password:   password,
-		mode:       mode,
-		folder:     defaultFolder,
-		options:    nil,
-		subjectRgx: subjectRgx,
-		bodyRgx:    bodyRgx,
+		server:    server,
+		user:      user,
+		password:  password,
+		mode:      mode,
+		folder:    defaultFolder,
+		options:   nil,
+		useOAuth2: useOAuth2,
 	}
 }
 
@@ -65,9 +103,7 @@ func (cl *Client) SetFolder(folder string) {
 	cl.folder = folder
 }
 
-func (cl *Client) Retrieve() (string, error) {
-	//"mail.example.org:993"
-	//"root", "asdf"
+func (cl *Client) Retrieve(subjectRgx *regexp.Regexp, bodyRgx *regexp.Regexp, verifyInterval int) (string, error) {
 	var c *imapclient.Client
 	var err error
 	switch cl.mode {
@@ -84,48 +120,81 @@ func (cl *Client) Retrieve() (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("unsupported mode %v", cl.mode.String())
 	}
-
 	defer c.Close()
-
-	if err = c.Login(cl.user, cl.password).Wait(); err != nil {
-		return "", err
+	if cl.useOAuth2 {
+		saslClient := NewOAuthBearerClient(&OAuth2BearerOptions{Username: cl.user, Token: cl.password})
+		if err = c.Authenticate(saslClient); err != nil {
+			return "", err
+		}
+	} else {
+		if err = c.Login(cl.user, cl.password).Wait(); err != nil {
+			return "", err
+		}
 	}
-
 	mailboxes, err := c.List("", "%", nil).Collect()
 	if err != nil {
 		return "", err
 	}
 	for _, mbox := range mailboxes {
-		fmt.Printf(" - %v", mbox.Mailbox)
+		fmt.Printf(" - %v\n", mbox.Mailbox)
 	}
-
 	selectedMbox, err := c.Select(cl.folder, nil).Wait()
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("%s contains %v messages", cl.folder, selectedMbox.NumMessages)
-
+	seqNum := selectedMbox.NumMessages
+	if seqNum == 0 {
+		return "", fmt.Errorf("empty mailbox")
+	}
+	fmt.Printf("%s contains %v messages\n", cl.folder, selectedMbox.NumMessages)
 	var data string
-
 	if selectedMbox.NumMessages > 0 {
-		seqSet := imap.SeqSetNum(1)
-		fetchOptions := &imap.FetchOptions{Envelope: true}
-		messages, err := c.Fetch(seqSet, fetchOptions).Collect()
-		if err != nil {
-			log.Fatalf("failed to fetch first message in INBOX: %v", err)
+		fetchOptions := &imap.FetchOptions{
+			Envelope: true,
 		}
-		if cl.subjectRgx.Match([]byte(messages[0].Envelope.Subject)) {
-			if body, err := cl.fetchBody(c, messages[0].SeqNum); err == nil {
-				if v := cl.bodyRgx.FindSubmatch(body); len(v) > 0 {
-					data = string(bytes.Join(v, []byte{' '}))
+		minTime := time.Now().Add(-time.Duration(verifyInterval) * time.Minute)
+		for {
+			err = fmt.Errorf("not found")
+			seqSet := imap.SeqSetNum(seqNum)
+			var messages []*imapclient.FetchMessageBuffer
+			messages, err = c.Fetch(seqSet, fetchOptions).Collect()
+			if err != nil {
+				err = fmt.Errorf("failed to fetch message: %v", err)
+				break
+			}
+			if len(messages) > 0 {
+				msg := messages[0]
+				if g1 := msg.Envelope.Date.Before(minTime); g1 {
+					err = fmt.Errorf("invalid date")
+					break
 				}
+				if subjectRgx.Match([]byte(msg.Envelope.Subject)) {
+					var body []byte
+					if body, err = cl.fetchBody(c, messages[0].SeqNum); err == nil {
+						tmp := strings.Replace(string(body), "\n", " ", -1)
+						tmp = strings.Replace(tmp, "\r", " ", -1)
+						if v := bodyRgx.FindStringSubmatch(tmp); len(v) > 0 {
+							err = nil
+							data = v[1]
+							break
+						}
+					} else {
+						//err =
+						//log.Fatalf("failed to fetch first message body in INBOX: %v", err)
+					}
+				}
+			}
+			fmt.Printf("not found %d\n", seqNum)
+			seqNum--
+			if seqNum <= 0 {
+				err = fmt.Errorf("")
+				break
 			}
 		}
 	}
-	if err = c.Logout().Wait(); err != nil {
-		return "", err
-	}
-	return data, nil
+	err = c.Logout().Wait()
+
+	return data, err
 }
 
 func (cl *Client) fetchBody(c *imapclient.Client, seqNum uint32) ([]byte, error) {
@@ -155,9 +224,16 @@ func (cl *Client) fetchBody(c *imapclient.Client, seqNum uint32) ([]byte, error)
 		return nil, fmt.Errorf("FETCH command did not return body section")
 	}
 	mr, err := mail.CreateReader(bs.Literal)
-	if err != nil {
-		return nil, err
+	if mr == nil {
+		if err != nil {
+			return nil, err
+		} else {
+			return nil, fmt.Errorf("nil reader")
+		}
 	}
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	/*
 		// Print a few header fields
