@@ -3,9 +3,11 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/markel1974/webautoma/src/email"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +59,7 @@ type Executor struct {
 func New(driver base.IWebDriver) *Executor {
 	e := &Executor{
 		templates:  nil,
-		quit:       false,
+		quit:       true,
 		maxRetry:   3,
 		timers:     make(map[string]*Timer),
 		stack:      nil,
@@ -943,6 +945,32 @@ func (e *Executor) doDownload(target string, value string) error {
 	return nil
 }
 
+func (e *Executor) doOtp(target string, value string) error {
+	opt := strings.Split(value, "|||")
+	if len(opt) < 2 {
+		return fmt.Errorf("invalid value, missing separator")
+	}
+	subjectRgx, err := regexp.Compile(opt[0])
+	if err != nil {
+		return err
+	}
+	bodyRgx, err := regexp.Compile(opt[1])
+	if err != nil {
+		return err
+	}
+	c, err := email.NewClientFromTarget(target)
+	if err != nil {
+		return err
+	}
+	k, err := c.Retrieve(subjectRgx, bodyRgx, 60*24)
+	if err != nil {
+		fmt.Println("ERROR:", err)
+		os.Exit(0)
+	}
+	fmt.Println(k)
+	return nil
+}
+
 // commandExec executes a given ConfigCommand using Executor's adapter and specified logic for diverse command types.
 // It performs various browser or system-related actions based on the command type, target, and additional parameters.
 // Returns an error if the command execution fails or is unimplemented.
@@ -1057,6 +1085,8 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 		err = e.doScroll(cmd)
 	case "noop":
 		//nothing to do
+	case "otp":
+		err = e.doOtp(target, value)
 	default:
 		err = fmt.Errorf("unimplemented command: %s", command)
 		//e.adapter.log(LogLevelWarning, "unimplemented command: "+command)

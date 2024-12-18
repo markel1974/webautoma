@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/markel1974/webautoma/src/email"
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/markel1974/webautoma/src/executor"
@@ -113,7 +115,61 @@ func launch(console bool, wdUrl *url.URL, args []string, sideFile string, result
 	return nil
 }
 
+/*
+func test() {
+	download := executor.NewDownloader(&http.Client{})
+	html := `<html>
+<a href="https://www.w3schools.com">Visit W3Schools</a>
+<a href="https://www.w3schools.com">Visit W3Schools</a>
+<a href="https://www.w3schools.com">Visit W3Schools</a>
+	</html>`
+
+	download.DoRetrieveHref(nil, html, "")
+	os.Exit(0)
+}
+*/
+
+func emailTester() {
+	//Email: dimon.probes@telecomitalia.it
+	//const userId = "CD038910"
+	//const pwd = "Ggfrt56_87&"
+	//const host = "mail.telecomitalia.it:993" // "10.14.252.100:993" //
+	//mode := email.ModeTLS
+	//z := email.NewClient(host, userId, pwd, mode, false)
+	target := "startTLS://markel@tin.it:Cristiana1976@box.tin.it:143"
+	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login"
+	opt := strings.Split(value, "|||")
+	if len(opt) < 2 {
+		fmt.Printf("invalid value, missing separator")
+		os.Exit(0)
+	}
+	subjectRgx, err := regexp.Compile(opt[0])
+	if err != nil {
+		fmt.Printf(err.Error())
+		os.Exit(0)
+	}
+	bodyRgx, err := regexp.Compile(opt[1])
+	if err != nil {
+		fmt.Printf(err.Error())
+		os.Exit(0)
+	}
+	z, err := email.NewClientFromTarget(target)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(0)
+	}
+	k, err := z.Retrieve(subjectRgx, bodyRgx, 60*24)
+	if err != nil {
+		fmt.Println("ERROR:", err)
+		os.Exit(0)
+	}
+	fmt.Println(k)
+
+	os.Exit(0)
+}
+
 func main() {
+	//emailTester()
 	//launcher.Start()
 	//os.Exit(-1)
 	var showHelp bool
