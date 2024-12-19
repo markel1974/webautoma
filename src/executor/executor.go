@@ -969,7 +969,7 @@ func (e *Executor) doOtp(target string, value string) error {
 	if err != nil {
 		return err
 	}
-	verifyInterval := time.Now().Unix() + options.VerifyInterval()
+	verifyInterval := time.Now().Unix() + options.VerifyIntervalSec()
 	var k string
 	for {
 		if k, err = c.Retrieve(options); err == nil {

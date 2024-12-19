@@ -36,6 +36,12 @@ type Oauth2BearerClient struct {
 	OAuth2BearerOptions
 }
 
+// NewOAuth2BearerClient An implementation of the OAUTHBEARER authentication mechanism, as
+// described in RFC 7628.
+func NewOAuth2BearerClient(opt *OAuth2BearerOptions) *Oauth2BearerClient {
+	return &Oauth2BearerClient{*opt}
+}
+
 func (a *Oauth2BearerClient) Start() (string, []byte, error) {
 	const sep = "\x01"
 	//var auth string
@@ -65,12 +71,6 @@ func (a *Oauth2BearerClient) Next(challenge []byte) ([]byte, error) {
 	} else {
 		return nil, authBearerErr
 	}
-}
-
-// NewOAuthBearerClient An implementation of the OAUTHBEARER authentication mechanism, as
-// described in RFC 7628.
-func NewOAuthBearerClient(opt *OAuth2BearerOptions) *Oauth2BearerClient {
-	return &Oauth2BearerClient{*opt}
 }
 
 /*
