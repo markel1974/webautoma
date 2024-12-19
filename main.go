@@ -149,7 +149,7 @@ func emailTester() {
 		fmt.Println(err)
 		os.Exit(0)
 	}
-	verifyInterval := time.Now().Unix() + options.VerifyInterval()
+	verifyInterval := time.Now().Unix() + options.VerifyIntervalSec()
 	var k string
 	for {
 		if k, err = z.Retrieve(options); err == nil {

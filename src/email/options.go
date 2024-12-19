@@ -8,18 +8,18 @@ import (
 )
 
 type Options struct {
-	subjectRgx     *regexp.Regexp
-	bodyRgx        *regexp.Regexp
-	verifyInterval int
-	validity       int
+	subjectRgx        *regexp.Regexp
+	bodyRgx           *regexp.Regexp
+	verifyIntervalSec int
+	validityMin       int
 }
 
 func NewOptions(value string) (*Options, error) {
 	t := &Options{
-		subjectRgx:     nil,
-		bodyRgx:        nil,
-		verifyInterval: 60,
-		validity:       60,
+		subjectRgx:        nil,
+		bodyRgx:           nil,
+		verifyIntervalSec: 60,
+		validityMin:       5,
 	}
 	opt := strings.Split(value, "|||")
 	if len(opt) < 2 {
@@ -35,13 +35,13 @@ func NewOptions(value string) (*Options, error) {
 		return nil, fmt.Errorf("invalid body regexp, %s", err.Error())
 	}
 	if len(opt) > 2 {
-		t.verifyInterval, err = strconv.Atoi(opt[2])
+		t.verifyIntervalSec, err = strconv.Atoi(opt[2])
 		if err != nil {
 			return nil, fmt.Errorf("invalid interval, %s", err.Error())
 		}
 	}
 	if len(opt) > 3 {
-		t.validity, err = strconv.Atoi(opt[3])
+		t.validityMin, err = strconv.Atoi(opt[3])
 		if err != nil {
 			return nil, fmt.Errorf("invalid interval, %s", err.Error())
 		}
@@ -49,10 +49,10 @@ func NewOptions(value string) (*Options, error) {
 	return t, nil
 }
 
-func (o *Options) Validity() int64 {
-	return int64(o.validity)
+func (o *Options) VerifyIntervalSec() int64 {
+	return int64(o.verifyIntervalSec)
 }
 
-func (o *Options) VerifyInterval() int64 {
-	return int64(o.verifyInterval)
+func (o *Options) ValidityMin() int64 {
+	return int64(o.validityMin)
 }

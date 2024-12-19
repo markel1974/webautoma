@@ -5,12 +5,15 @@ import (
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message/mail"
+	"github.com/emersion/go-sasl"
 	"io"
 	"strings"
 	"time"
 )
 
-//https://github.com/emersion/go-imap/blob/v2/imapclient/example_test.go
+// https://github.com/emersion/go-imap/blob/v2/imapclient/example_test.go
+const oAuthMode = "[oauth]"
+const oAuth2Mode = "[oauth2]"
 
 const defaultFolder = "INBOX"
 
@@ -35,20 +38,20 @@ func (m Mode) String() string {
 }
 
 type Client struct {
-	mode      Mode
-	server    string
-	user      string
-	password  string
-	folder    string
-	options   *imapclient.Options
-	useOAuth2 bool
+	mode     Mode
+	server   string
+	user     string
+	password string
+	folder   string
+	options  *imapclient.Options
+	authMode string
+	debug    bool
 }
 
 func NewClientFromTarget(target string) (*Client, error) {
 	const protoSep = "://"
 	const serverSep = "@"
 	const userSep = ":"
-	const oauth2Mode = "[oauth2]"
 	pos := strings.LastIndex(target, serverSep)
 	if pos <= 0 {
 		return nil, fmt.Errorf("invalid target, missing server section")
@@ -68,10 +71,13 @@ func NewClientFromTarget(target string) (*Client, error) {
 	user := p2[:pos]
 	password := p2[pos+len(userSep):]
 	mode := ModeTLS
-	useOAuth2 := false
-	if strings.Contains(k, oauth2Mode) {
-		k = strings.Replace(k, oauth2Mode, "", -1)
-		useOAuth2 = true
+	authMode := ""
+	if strings.Contains(k, oAuth2Mode) {
+		authMode = oAuth2Mode
+		k = strings.Replace(k, oAuth2Mode, "", -1)
+	} else if strings.Contains(k, oAuthMode) {
+		authMode = oAuthMode
+		k = strings.Replace(k, oAuthMode, "", -1)
 	}
 	switch strings.ToLower(k) {
 	case "insecure":
@@ -83,19 +89,24 @@ func NewClientFromTarget(target string) (*Client, error) {
 	default:
 		return nil, fmt.Errorf("invalid target, unknown mode %s", k)
 	}
-	return NewClient(server, user, password, mode, useOAuth2), nil
+	return NewClient(server, user, password, mode, authMode), nil
 }
 
-func NewClient(server string, user string, password string, mode Mode, useOAuth2 bool) *Client {
+func NewClient(server string, user string, password string, mode Mode, authMode string) *Client {
 	return &Client{
-		server:    server,
-		user:      user,
-		password:  password,
-		mode:      mode,
-		folder:    defaultFolder,
-		options:   nil,
-		useOAuth2: useOAuth2,
+		server:   server,
+		user:     user,
+		password: password,
+		mode:     mode,
+		folder:   defaultFolder,
+		options:  nil,
+		authMode: authMode,
+		debug:    false,
 	}
+}
+
+func (cl *Client) SetDebug(debug bool) {
+	cl.debug = debug
 }
 
 func (cl *Client) SetFolder(folder string) {
@@ -120,12 +131,18 @@ func (cl *Client) Retrieve(opt *Options) (string, error) {
 		return "", fmt.Errorf("unsupported mode %v", cl.mode.String())
 	}
 	defer c.Close()
-	if cl.useOAuth2 {
-		saslClient := NewOAuthBearerClient(&OAuth2BearerOptions{Username: cl.user, Token: cl.password})
+	switch cl.authMode {
+	case oAuthMode:
+		saslClient := sasl.NewOAuthBearerClient(&sasl.OAuthBearerOptions{Username: cl.user, Token: cl.password})
 		if err = c.Authenticate(saslClient); err != nil {
 			return "", err
 		}
-	} else {
+	case oAuth2Mode:
+		saslClient := NewOAuth2BearerClient(&OAuth2BearerOptions{Username: cl.user, Token: cl.password})
+		if err = c.Authenticate(saslClient); err != nil {
+			return "", err
+		}
+	default:
 		if err = c.Login(cl.user, cl.password).Wait(); err != nil {
 			return "", err
 		}
@@ -134,8 +151,10 @@ func (cl *Client) Retrieve(opt *Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, mbox := range mailboxes {
-		fmt.Printf(" - %v\n", mbox.Mailbox)
+	if cl.debug {
+		for _, mbox := range mailboxes {
+			fmt.Printf(" - %v\n", mbox.Mailbox)
+		}
 	}
 	selectedMbox, err := c.Select(cl.folder, nil).Wait()
 	if err != nil {
@@ -145,13 +164,15 @@ func (cl *Client) Retrieve(opt *Options) (string, error) {
 	if seqNum == 0 {
 		return "", fmt.Errorf("empty mailbox")
 	}
-	fmt.Printf("%s contains %v messages\n", cl.folder, selectedMbox.NumMessages)
+	if cl.debug {
+		fmt.Printf("%s contains %v messages\n", cl.folder, selectedMbox.NumMessages)
+	}
 	var data string
 	if selectedMbox.NumMessages > 0 {
 		fetchOptions := &imap.FetchOptions{
 			Envelope: true,
 		}
-		minTime := time.Now().Add(-time.Duration(opt.validity) * time.Minute)
+		minTime := time.Now().Add(-time.Duration(opt.ValidityMin()) * time.Minute)
 		for {
 			seqSet := imap.SeqSetNum(seqNum)
 			var messages []*imapclient.FetchMessageBuffer
@@ -182,7 +203,9 @@ func (cl *Client) Retrieve(opt *Options) (string, error) {
 					}
 				}
 			}
-			fmt.Printf("not found %d\n", seqNum)
+			if cl.debug {
+				fmt.Printf("not found %d\n", seqNum)
+			}
 			seqNum--
 			if seqNum <= 0 {
 				err = fmt.Errorf("")
