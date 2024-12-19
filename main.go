@@ -9,8 +9,8 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
+	"time"
 
 	"github.com/markel1974/webautoma/src/executor"
 	"github.com/markel1974/webautoma/src/server"
@@ -135,20 +135,9 @@ func emailTester() {
 	//const pwd = "Ggfrt56_87&"
 	//const host = "mail.telecomitalia.it:993" // "10.14.252.100:993" //
 	//mode := email.ModeTLS
-	//z := email.NewClient(host, userId, pwd, mode, false)
 	target := "startTLS://markel@tin.it:Cristiana1976@box.tin.it:143"
-	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login"
-	opt := strings.Split(value, "|||")
-	if len(opt) < 2 {
-		fmt.Printf("invalid value, missing separator")
-		os.Exit(0)
-	}
-	subjectRgx, err := regexp.Compile(opt[0])
-	if err != nil {
-		fmt.Printf(err.Error())
-		os.Exit(0)
-	}
-	bodyRgx, err := regexp.Compile(opt[1])
+	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login|||60|||1440"
+	options, err := email.NewOptions(value)
 	if err != nil {
 		fmt.Printf(err.Error())
 		os.Exit(0)
@@ -158,7 +147,17 @@ func emailTester() {
 		fmt.Println(err)
 		os.Exit(0)
 	}
-	k, err := z.Retrieve(subjectRgx, bodyRgx, 60*24)
+	verifyInterval := time.Now().Unix() + options.VerifyInterval()
+	var k string
+	for {
+		if k, err = z.Retrieve(options); err == nil {
+			break
+		}
+		time.Sleep(time.Second * 5)
+		if time.Now().Unix() > verifyInterval {
+			break
+		}
+	}
 	if err != nil {
 		fmt.Println("ERROR:", err)
 		os.Exit(0)

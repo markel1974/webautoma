@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -53,6 +52,7 @@ type Executor struct {
 	sam          *SamConsole
 	downloadPath string
 	downloader   *Downloader
+	otp          string
 }
 
 // New initializes and returns a new Executor instance configured with the provided IWebDriver.
@@ -69,6 +69,7 @@ func New(driver base.IWebDriver) *Executor {
 		baseUrl:    "",
 		sam:        nil,
 		downloader: NewDownloader(&http.Client{}),
+		otp:        "",
 	}
 	downloadPath, err := os.UserHomeDir()
 	if err == nil {
@@ -147,6 +148,12 @@ func (e *Executor) loadUrl(url string) error {
 	}
 	e.baseUrl = url
 	return nil
+}
+
+func (e *Executor) computeTemplate(value string) string {
+	//TODO implement real template
+	value = strings.Replace(value, "{{.otp}}", e.otp, -1)
+	return value
 }
 
 // computeScroll parses the scroll value, extracting scroll coordinates, step count, and interval from the input string.
@@ -292,6 +299,9 @@ func (e *Executor) doType(target string, value string) error {
 		}
 		return e.adapter.SendKeys(by, data, value)
 	}
+
+	//TODO compute template
+	value = e.computeTemplate(value)
 	for _, v := range []rune(value) {
 		time.Sleep(time.Millisecond * 100)
 		if err := e.adapter.KeyDown(string(v)); err != nil {
@@ -742,7 +752,8 @@ func (e *Executor) doActionsSendKeys(value string) error {
 	//	e.adapter.KeyDown(base.DownArrowKey)
 	//	time.Sleep(100 * time.Millisecond)
 	//}
-
+	//TODO template
+	value = e.computeTemplate(value)
 	return e.adapter.KeyDown(value)
 }
 
@@ -945,16 +956,12 @@ func (e *Executor) doDownload(target string, value string) error {
 	return nil
 }
 
+// doOtp retrieves a one-time password (OTP) by interacting with an email client using specified target and value parameters.
+// It constructs options and a client based on provided inputs, then attempts OTP retrieval within a verification interval.
+// Returns an error if any step in the OTP retrieval or client interaction process fails.
 func (e *Executor) doOtp(target string, value string) error {
-	opt := strings.Split(value, "|||")
-	if len(opt) < 2 {
-		return fmt.Errorf("invalid value, missing separator")
-	}
-	subjectRgx, err := regexp.Compile(opt[0])
-	if err != nil {
-		return err
-	}
-	bodyRgx, err := regexp.Compile(opt[1])
+	e.otp = ""
+	options, err := email.NewOptions(value)
 	if err != nil {
 		return err
 	}
@@ -962,12 +969,21 @@ func (e *Executor) doOtp(target string, value string) error {
 	if err != nil {
 		return err
 	}
-	k, err := c.Retrieve(subjectRgx, bodyRgx, 60*24)
-	if err != nil {
-		fmt.Println("ERROR:", err)
-		os.Exit(0)
+	verifyInterval := time.Now().Unix() + options.VerifyInterval()
+	var k string
+	for {
+		if k, err = c.Retrieve(options); err == nil {
+			break
+		}
+		time.Sleep(time.Second * 5)
+		if time.Now().Unix() > verifyInterval {
+			break
+		}
 	}
-	fmt.Println(k)
+	if err != nil {
+		return err
+	}
+	e.otp = k
 	return nil
 }
 
