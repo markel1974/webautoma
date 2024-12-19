@@ -68,10 +68,10 @@ func NewClientFromTarget(target string) (*Client, error) {
 	user := p2[:pos]
 	password := p2[pos+len(userSep):]
 	mode := ModeTLS
-	useAuth := false
+	useOAuth2 := false
 	if strings.Contains(k, oauth2Mode) {
 		k = strings.Replace(k, oauth2Mode, "", -1)
-		useAuth = true
+		useOAuth2 = true
 	}
 	switch strings.ToLower(k) {
 	case "insecure":
@@ -83,7 +83,7 @@ func NewClientFromTarget(target string) (*Client, error) {
 	default:
 		return nil, fmt.Errorf("invalid target, unknown mode %s", k)
 	}
-	return NewClient(server, user, password, mode, useAuth), nil
+	return NewClient(server, user, password, mode, useOAuth2), nil
 }
 
 func NewClient(server string, user string, password string, mode Mode, useOAuth2 bool) *Client {
