@@ -6,7 +6,6 @@ import (
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message/mail"
 	"io"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -103,7 +102,7 @@ func (cl *Client) SetFolder(folder string) {
 	cl.folder = folder
 }
 
-func (cl *Client) Retrieve(subjectRgx *regexp.Regexp, bodyRgx *regexp.Regexp, verifyInterval int) (string, error) {
+func (cl *Client) Retrieve(opt *Options) (string, error) {
 	var c *imapclient.Client
 	var err error
 	switch cl.mode {
@@ -152,9 +151,8 @@ func (cl *Client) Retrieve(subjectRgx *regexp.Regexp, bodyRgx *regexp.Regexp, ve
 		fetchOptions := &imap.FetchOptions{
 			Envelope: true,
 		}
-		minTime := time.Now().Add(-time.Duration(verifyInterval) * time.Minute)
+		minTime := time.Now().Add(-time.Duration(opt.validity) * time.Minute)
 		for {
-			err = fmt.Errorf("not found")
 			seqSet := imap.SeqSetNum(seqNum)
 			var messages []*imapclient.FetchMessageBuffer
 			messages, err = c.Fetch(seqSet, fetchOptions).Collect()
@@ -168,12 +166,12 @@ func (cl *Client) Retrieve(subjectRgx *regexp.Regexp, bodyRgx *regexp.Regexp, ve
 					err = fmt.Errorf("invalid date")
 					break
 				}
-				if subjectRgx.Match([]byte(msg.Envelope.Subject)) {
+				if opt.subjectRgx.Match([]byte(msg.Envelope.Subject)) {
 					var body []byte
 					if body, err = cl.fetchBody(c, messages[0].SeqNum); err == nil {
 						tmp := strings.Replace(string(body), "\n", " ", -1)
 						tmp = strings.Replace(tmp, "\r", " ", -1)
-						if v := bodyRgx.FindStringSubmatch(tmp); len(v) > 0 {
+						if v := opt.bodyRgx.FindStringSubmatch(tmp); len(v) > 0 {
 							err = nil
 							data = v[1]
 							break
@@ -192,8 +190,10 @@ func (cl *Client) Retrieve(subjectRgx *regexp.Regexp, bodyRgx *regexp.Regexp, ve
 			}
 		}
 	}
-	err = c.Logout().Wait()
-
+	_ = c.Logout().Wait()
+	if err == nil && len(data) == 0 {
+		err = fmt.Errorf("not found")
+	}
 	return data, err
 }
 
