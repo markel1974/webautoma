@@ -135,10 +135,10 @@ func emailTester() {
 	//const pwd = "Ggfrt56_87&"
 	//const host = "mail.telecomitalia.it:993" // "10.14.252.100:993" //
 	//mode := email.ModeTLS
-	target := "startTLS://markel@tin.it:Cristiana1976@box.tin.it:143"
+	target := "startTLS[plain]://markel@tin.it:Cristiana1976@box.tin.it:143"
 	//target := "tls://CD021960:ab_ert@klDffTLG_-24-11-2022@mail.telecomitalia.it:993"
 	//target := "tls://CD038910:Ggfrt56_87_@mail.telecomitalia.it:993"
-	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login|||60|||1440"
+	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login|||60|||2880"
 	options, err := email.NewOptions(value)
 	if err != nil {
 		fmt.Printf(err.Error())
