@@ -72,14 +72,12 @@ func NewClientFromTarget(target string) (*Client, error) {
 	password := p2[pos+len(userSep):]
 	mode := ModeTLS
 	authMode := ""
-	if strings.Contains(k, oAuth2Mode) {
-		authMode = oAuth2Mode
-		k = strings.Replace(k, oAuth2Mode, "", -1)
-	} else if strings.Contains(k, oAuthMode) {
-		authMode = oAuthMode
-		k = strings.Replace(k, oAuthMode, "", -1)
+
+	if pos = strings.Index(k, "["); pos > 0 {
+		authMode = k[pos:]
+		k = k[:pos]
 	}
-	switch strings.ToLower(k) {
+	switch strings.TrimSpace(strings.ToLower(k)) {
 	case "insecure":
 		mode = ModeInsecure
 	case "starttls":
