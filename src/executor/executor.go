@@ -292,6 +292,8 @@ func (e *Executor) doType(target string, value string) error {
 	if len(value) <= 0 {
 		return nil
 	}
+	//TODO compute template
+	value = e.computeTemplate(value)
 	if len(target) > 0 {
 		by, data, err := e.computeSelector(target)
 		if err != nil {
@@ -299,9 +301,6 @@ func (e *Executor) doType(target string, value string) error {
 		}
 		return e.adapter.SendKeys(by, data, value)
 	}
-
-	//TODO compute template
-	value = e.computeTemplate(value)
 	for _, v := range []rune(value) {
 		time.Sleep(time.Millisecond * 100)
 		if err := e.adapter.KeyDown(string(v)); err != nil {
