@@ -1,5 +1,7 @@
 package base
 
+import "strings"
+
 // KeyAction represents an activity involving a keyboard key.
 type KeyAction map[string]interface{}
 
@@ -44,7 +46,7 @@ const (
 	MultiplyKey   = string('\ue024')
 	AddKey        = string('\ue025')
 	SeparatorKey  = string('\ue026')
-	SubstractKey  = string('\ue027')
+	SubtractKey   = string('\ue027')
 	DecimalKey    = string('\ue028')
 	DivideKey     = string('\ue029')
 	F1Key         = string('\ue031')
@@ -61,6 +63,78 @@ const (
 	F12Key        = string('\ue03c')
 	MetaKey       = string('\ue03d')
 )
+
+var _mapping = make(map[string]string)
+
+func init() {
+	var mapping = map[string]string{
+		"Null":      NullKey,
+		"Cancel":    CancelKey,
+		"Help":      HelpKey,
+		"Backspace": BackspaceKey,
+		"Tab":       TabKey,
+		"Clear":     ClearKey,
+		"Return":    ReturnKey,
+		"Enter":     EnterKey,
+		"Shift":     ShiftKey,
+		"Control":   ControlKey,
+		"Alt":       AltKey,
+		"Pause":     PauseKey,
+		"Escape":    EscapeKey,
+		"Space":     SpaceKey,
+		"PageUp":    PageUpKey,
+		"PageDown":  PageDownKey,
+		"End":       EndKey,
+		"Home":      HomeKey,
+		"Left":      LeftArrowKey,
+		"Up":        UpArrowKey,
+		"Right":     RightArrowKey,
+		"Down":      DownArrowKey,
+		"Insert":    InsertKey,
+		"Delete":    DeleteKey,
+		"Semicolon": SemicolonKey,
+		"Equals":    EqualsKey,
+		"Numpad0":   Numpad0Key,
+		"Numpad1":   Numpad1Key,
+		"Numpad2":   Numpad2Key,
+		"Numpad3":   Numpad3Key,
+		"Numpad4":   Numpad4Key,
+		"Numpad5":   Numpad5Key,
+		"Numpad6":   Numpad6Key,
+		"Numpad7":   Numpad7Key,
+		"Numpad8":   Numpad8Key,
+		"Numpad9":   Numpad9Key,
+		"Multiply":  MultiplyKey,
+		"Add":       AddKey,
+		"Separator": SeparatorKey,
+		"Subtract":  SubtractKey,
+		"Decimal":   DecimalKey,
+		"Divide":    DivideKey,
+		"F1":        F1Key,
+		"F2":        F2Key,
+		"F3":        F3Key,
+		"F4":        F4Key,
+		"F5":        F5Key,
+		"F6":        F6Key,
+		"F7":        F7Key,
+		"F8":        F8Key,
+		"F9":        F9Key,
+		"F10":       F10Key,
+		"F11":       F11Key,
+		"F12":       F12Key,
+		"Meta":      MetaKey,
+	}
+	for k, v := range mapping {
+		_mapping[strings.ToLower(k)] = v
+	}
+}
+
+func KeyFromMapping(key string) string {
+	if v, ok := _mapping[strings.ToLower(key)]; ok {
+		return v
+	}
+	return key
+}
 
 // KeyPauseAction builds a KeyAction which pauses for the supplied duration.
 func KeyPauseAction(ms uint) KeyAction {

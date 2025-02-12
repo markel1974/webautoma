@@ -310,6 +310,15 @@ func (e *Executor) doType(target string, value string) error {
 	return nil
 }
 
+func (e *Executor) doKeys(value string) error {
+	//TODO compute template
+	value = e.computeTemplate(value)
+	if err := e.adapter.SendKeysActions(strings.Split(value, ",")); err != nil {
+		return err
+	}
+	return nil
+}
+
 // doRunScript executes the given script with specified arguments using the adapter and returns any resulting errors.
 func (e *Executor) doRunScript(script string, args []interface{}) error {
 	return e.adapter.ExecuteScript(script, args)
@@ -1046,6 +1055,8 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 		err = e.doClickDownload(target, value)
 	case "type":
 		err = e.doType(target, value)
+	case "keys":
+		err = e.doKeys(value)
 	case "runScript":
 		err = e.doRunScript(target, nil)
 	case "humanWait":
