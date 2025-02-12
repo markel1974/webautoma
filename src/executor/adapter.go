@@ -471,6 +471,42 @@ func (e *Adapter) FindAttribute(by string, data string, attribute string) (strin
 	return val, err
 }
 
+func (e *Adapter) SendKeysActions(values []string) error {
+	var keys []base.KeyAction
+	for _, v := range values {
+		m := strings.Split(v, ":")
+		if len(m) >= 2 {
+			key := strings.TrimSpace(strings.ToLower(m[0]))
+			val := m[1]
+			switch key {
+			case "press":
+				keys = append(keys, base.KeyDownAction(base.KeyFromMapping(val)))
+			case "release":
+				keys = append(keys, base.KeyDownAction(base.KeyFromMapping(val)))
+			case "pause":
+				w := uint(100)
+				if a, err := strconv.Atoi(val); err == nil {
+					w = uint(a)
+				}
+				keys = append(keys, base.KeyPauseAction(w))
+			}
+		} else {
+			keys = append(keys, base.KeyDownAction(v))
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	e.driver.StoreKeyActions("keyboard "+uuid.New().String(), keys...)
+	if err := e.driver.PerformActions(); err != nil {
+		return err
+	}
+	if err := e.driver.ReleaseActions(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // SendKeys sends a sequence of characters to the targeted web element located by the specified selector.
 func (e *Adapter) SendKeys(by string, data string, value string) error {
 	if len(value) == 0 {
