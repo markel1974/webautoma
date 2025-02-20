@@ -482,7 +482,7 @@ func (e *Adapter) SendKeysActions(values []string) error {
 			case "press":
 				keys = append(keys, base.KeyDownAction(base.KeyFromMapping(val)))
 			case "release":
-				keys = append(keys, base.KeyDownAction(base.KeyFromMapping(val)))
+				keys = append(keys, base.KeyUpAction(base.KeyFromMapping(val)))
 			case "pause":
 				w := uint(100)
 				if a, err := strconv.Atoi(val); err == nil {
