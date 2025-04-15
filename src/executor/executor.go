@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -388,32 +389,56 @@ func (e *Executor) doListWindows() ([]string, error) {
 }
 
 // doSelectWindowTitle switches to a browser window by its title. Returns an error if no such window is found.
-func (e *Executor) doSelectWindowTitle(title string) error {
+func (e *Executor) doSelectWindowTitle(target string, title string) error {
+	const modeContains = "contains"
+	const modeRegexp = "regexp"
+	const modeExact = "exact"
+	var targetRgx *regexp.Regexp = nil
+	target = strings.TrimSpace(strings.ToLower(target))
 	currentWindow, err := e.adapter.CurrentWindowHandle()
 	if err != nil {
 		return err
 	}
-	lowerTitle := strings.ToLower(title)
+
 	var found = false
 	windows, err := e.adapter.WindowHandles()
 	if err != nil {
 		return err
 	}
 	for _, window := range windows {
-		if err := e.adapter.SwitchWindow(window); err != nil {
+		if err = e.adapter.SwitchWindow(window); err != nil {
 			continue
 		}
-		windowTitle, err := e.adapter.Title()
+		var windowTitle string
+		windowTitle, err = e.adapter.Title()
 		if err != nil {
 			continue
 		}
-		if len(lowerTitle) == 0 && len(windowTitle) == 0 {
+		if len(title) == 0 && len(windowTitle) == 0 {
 			found = true
 			break
 		}
-		if strings.Contains(strings.ToLower(windowTitle), lowerTitle) {
-			found = true
-			break
+		if target == "" || target == modeContains {
+			lowerTitle := strings.ToLower(title)
+			if strings.Contains(strings.ToLower(windowTitle), lowerTitle) {
+				found = true
+				break
+			}
+		} else if target == modeExact {
+			if windowTitle == title {
+				found = true
+				break
+			}
+		} else if target == modeRegexp {
+			if targetRgx == nil {
+				if targetRgx, err = regexp.Compile(title); err != nil {
+					return fmt.Errorf("invalid regexp: %s", err.Error())
+				}
+			}
+			if targetRgx.MatchString(windowTitle) {
+				found = true
+				break
+			}
 		}
 	}
 	if !found {
@@ -1070,7 +1095,7 @@ func (e *Executor) commandExec(cmd ConfigCommand) error {
 	case "selectWindowMain":
 		err = e.doSelectWindowMain()
 	case "selectWindowTitle":
-		err = e.doSelectWindowTitle(value)
+		err = e.doSelectWindowTitle(target, value)
 	case "selectFrame":
 		err = e.doSelectFrame(target)
 	case "selectParentFrame":
