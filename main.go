@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/markel1974/webautoma/src/email"
+	"github.com/markel1974/webautoma/src/help"
 	"log"
 	"net/url"
 	"os"
@@ -170,6 +171,23 @@ func emailTester() {
 	os.Exit(0)
 }
 
+func manPage(man string) {
+	h := help.NewHelp()
+	if man == "list" {
+		for _, cmd := range h.GetSupportedCommands() {
+			fmt.Println(cmd)
+		}
+		return
+	}
+	res, err := h.GetFormatted(man)
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println(res)
+	}
+}
+
+// -p 50312 -x slide.side.json
 func main() {
 	//emailTester()
 	//launcher.Start()
@@ -192,6 +210,8 @@ func main() {
 	var listen string
 	var sam bool
 
+	var man string
+
 	//wd.Example3()
 
 	flag.BoolVar(&showHelp, "h", false, "show this help")
@@ -211,6 +231,7 @@ func main() {
 	flag.StringVar(&variables, "z", "", "side variables (es a=10;b=20), if you start the data with the letter @, the rest should be a filename (in ndjson format)")
 	flag.BoolVar(&imgDump, "a", false, "image dump")
 	flag.BoolVar(&sam, "e", false, "launch SAM console")
+	flag.StringVar(&man, "m", "", "man verb pages (list show all verbs)")
 
 	flag.Parse()
 
@@ -221,6 +242,11 @@ func main() {
 
 	if showVersion {
 		fmt.Println(version.AppName, version.AppVersion)
+		return
+	}
+
+	if len(man) > 0 {
+		manPage(man)
 		return
 	}
 
