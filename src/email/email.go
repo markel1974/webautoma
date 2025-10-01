@@ -2,13 +2,14 @@ package email
 
 import (
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message/mail"
 	"github.com/emersion/go-sasl"
-	"io"
-	"strings"
-	"time"
 )
 
 // https://github.com/emersion/go-imap/blob/v2/imapclient/example_test.go
