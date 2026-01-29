@@ -3,7 +3,6 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/markel1974/webautoma/src/email"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/markel1974/webautoma/src/email"
 
 	"github.com/markel1974/webautoma/src/wd/base"
 )
@@ -123,6 +124,9 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	if len(e.cfg.DownloadPath) > 0 {
 		e.downloadPath = e.cfg.DownloadPath
 	}
+	if len(e.cfg.ProbeId) != 0 {
+		e.adapter.SetProbeId(e.cfg.ProbeId)
+	}
 	if e.cfg.Debug {
 		e.adapter.EnableDebug(true)
 	}
@@ -151,6 +155,7 @@ func (e *Executor) loadUrl(url string) error {
 	return nil
 }
 
+// computeTemplate replaces placeholders in the input string value with corresponding fields from the Executor instance.
 func (e *Executor) computeTemplate(value string) string {
 	//TODO implement real template
 	value = strings.Replace(value, "{{.otp}}", e.otp, -1)

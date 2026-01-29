@@ -35,5 +35,6 @@ type Config struct {
 	ProfileCapture          []string     `json:"profileCapture"`
 	ProfileSupportedMethods []string     `json:"profileSupportedMethods"`
 	Tests                   []ConfigTest `json:"tests"`
+	ProbeId                 string       `json:"probeId"`
 	Debug                   bool         `json:"debug"`
 }
