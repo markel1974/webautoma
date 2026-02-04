@@ -84,7 +84,11 @@ func New(driver base.IWebDriver) *Executor {
 // Setup initializes the executor with configuration, templates, and adapter settings based on provided parameters.
 func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDump bool, profileCapture []string, variables map[string]interface{}) error {
 	var err error
-	e.execId = computeFileId(sideFile)
+	if len(e.cfg.ThreadName) > 0 {
+		e.execId = e.cfg.ThreadName
+	} else {
+		e.execId = computeFileId(sideFile)
+	}
 	e.templates = NewTemplates(variables)
 	if logFile, err = e.templates.Apply(logFile, nil); err != nil {
 		return err
