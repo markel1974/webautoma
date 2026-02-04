@@ -36,5 +36,6 @@ type Config struct {
 	ProfileSupportedMethods []string     `json:"profileSupportedMethods"`
 	Tests                   []ConfigTest `json:"tests"`
 	ProbeId                 string       `json:"probeId"`
+	ThreadName              string       `json:"threadName"`
 	Debug                   bool         `json:"debug"`
 }
