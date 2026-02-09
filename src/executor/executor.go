@@ -82,12 +82,15 @@ func New(driver base.IWebDriver) *Executor {
 }
 
 // Setup initializes the executor with configuration, templates, and adapter settings based on provided parameters.
-func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDump bool, profileCapture []string, variables map[string]interface{}) error {
+func (e *Executor) Setup(cfgFile string, logFile string, imgFile string, imgDump bool, profileCapture []string, variables map[string]interface{}) error {
 	var err error
-	if len(e.cfg.ThreadName) > 0 {
-		e.execId = e.cfg.ThreadName
-	} else {
-		e.execId = computeFileId(sideFile)
+	var fileData []byte
+	e.cfgFile = cfgFile
+	if fileData, err = os.ReadFile(e.cfgFile); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(fileData, &e.cfg); err != nil {
+		return err
 	}
 	e.templates = NewTemplates(variables)
 	if logFile, err = e.templates.Apply(logFile, nil); err != nil {
@@ -96,17 +99,13 @@ func (e *Executor) Setup(sideFile string, logFile string, imgFile string, imgDum
 	if imgFile, err = e.templates.Apply(imgFile, nil); err != nil {
 		return err
 	}
-	if e.cfgFile, err = e.templates.Apply(sideFile, nil); err != nil {
-		return err
+	if len(e.cfg.ThreadName) > 0 {
+		if e.execId, err = e.templates.Apply(e.cfg.ThreadName, nil); err != nil {
+			return err
+		}
+	} else {
+		e.execId = computeFileId(cfgFile)
 	}
-	var fileData []byte
-	if fileData, err = os.ReadFile(e.cfgFile); err != nil {
-		return err
-	}
-	if err = json.Unmarshal(fileData, &e.cfg); err != nil {
-		return err
-	}
-
 	if e.cfg.ProfileCapture != nil {
 		profileCapture = e.cfg.ProfileCapture
 	}
