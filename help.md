@@ -1,971 +1,424 @@
-Manuale Utente webautoma
+# webautoma User Manual
 
-Introduzione
+## Introduction
 
-(Placeholder: Descrizione generale di webautoma, scopi, punti di forza, requisiti)
+(Placeholder: General description of webautoma, purposes, strengths, requirements)
 
-Installazione e Avvio Rapido
+## Installation and Quick Start
 
-(Placeholder: Istruzioni su come compilare/installare, setup del WebDriver, esempio di avvio base)
+(Placeholder: Instructions on how to compile/install, WebDriver setup, basic startup example)
 
-Uso Base (Esecuzione .side)
+## Basic Usage (.side Execution)
 
-(Placeholder: Spiegazione flag principali, formato output, interpretazione log/immagini)
+(Placeholder: Explanation of main flags, output format, interpreting logs/images)
 
-Formato File .side
+## .side File Format
 
-Si basa sul formato JSON standard di Selenium IDE v3, con alcuni comandi e parametri aggiuntivi specifici per webautoma.
+It is based on the standard Selenium IDE v3 JSON format, with some additional commands and parameters specific to webautoma.
 
-Struttura Generale
+### General Structure
 
-(Placeholder: Descrizione della struttura JSON principale del file .side: version, name, url, tests, suites...)
+(Placeholder: Description of the main JSON structure of the .side file: version, name, url, tests, suites...)
 
-Struttura Comando
+### Command Structure
 
-Ogni comando all'interno di un test segue questa struttura JSON base:
+Each command within a test follows this basic JSON structure:
 
+```json
 {
-"id": "stringa-univoca",
-"command": "nomeComando",
-"target": "selettore_o_valore",
-"value": "valore_o_parametro",
-// Campi specifici di webautoma possono essere presenti qui
-"until": "condizione_attesa", // Es: "1"
-"windowHandleName": "nome_handle",
-"windowTimeout": millisecondi,
+"id": "unique-string",
+"command": "commandName",
+"target": "selector_or_value",
+"value": "value_or_parameter",
+// Specific webautoma fields may be present here
+"until": "wait_condition", // Ex: "1"
+"windowHandleName": "handle_name",
+"windowTimeout": milliseconds,
 "opensWindow": true/false,
-"x": coordinata_x,
-"y": coordinata_y,
+"x": coordinate_x,
+"y": coordinate_y,
 "offsetX": offset_x,
 "offsetY": offset_y
 }
+```
+
+**Main Fields:**
+
+- `id`: Unique identifier of the test step (standard Selenium IDE).
+- `command`: The name of the webautoma command to execute (see below).
+- `target`: The object of the action (e.g., CSS/XPath selector, URL, timer ID, variable name). Supports templating `{{.variable}}`.
+- `value`: The value associated with the command (e.g., text to type, expected value, specific options). Supports templating `{{.variable}}`.
+
+**Specific webautoma Fields (Optional):**
+
+- `until`: Used by `assert`, `exists`, `until`. Indicates a wait condition (e.g., `1` to wait for the element to be ready - visible and enabled).
+- `windowHandleName`, `windowTimeout`, `opensWindow`: Used for advanced window/tab management (see specific commands).
+- `x`, `y`, `offsetX`, `offsetY`: Used for commands requiring coordinates or offsets (e.g., `scroll`, `scrollTo`).
+
+## Supported Commands
+
+Here is the list of commands recognized by webautoma:
+
+### Category: Navigation
+
+1. **open**
+   - **Description:** Opens a URL in the browser or navigates to a path relative to the current base URL.
+   - **Parameters:**
+     - `target`: The full URL (e.g., https://google.com) or a relative path (e.g., /page). If relative, it is appended to the base url defined in the .side file or the last known base URL.
+     - `value`: Not used.
+   - **Example:**
+     ```json
+     {
+       "id": "...",
+       "command": "open",
+       "target": "https://www.google.com",
+       "value": ""
+     }
+     ```
+
+### Category: Element Interaction
+
+2. **click**
+   - **Description:** Simulates a mouse click on the specified element. Waits for the element to be ready (visible and enabled) before clicking.
+   - **Parameters:**
+     - `target`: The selector of the element to click (e.g., id=myButton, css=.submit-btn).
+     - `value`: Not used.
+     - `until`: If set to `1` or `2`, waits for the element to be ready before clicking.
+   - **Example:**
+     ```json
+     {
+       "id": "...",
+       "command": "click",
+       "target": "id=loginButton",
+       "value": "",
+       "until": "1"
+     }
+     ```
+
+3. **type**
+   - **Description:** Enters text into an input or textarea field. Simulates character-by-character typing with a small delay (see humanWait).
+   - **Parameters:**
+     - `target`: The selector of the element to type into (e.g., id=username, name=password).
+     - `value`: The text to insert. Supports variables (e.g., `{{.myUsername}}`).
+     - `until`: If set to `1` or `2`, waits for the element to be ready before typing.
+   - **Example:**
+     ```json
+     {
+       "id": "...",
+       "command": "type",
+       "target": "id=searchField",
+       "value": "Text to search"
+     }
+     ```
+
+4. **select**
+   - **Description:** Selects an option from a `<select>` (dropdown) element based on the option's visible text (label).
+   - **Parameters:**
+     - `target`: The selector of the `<select>` element.
+     - `value`: The string `label=Option Text` that identifies the option to select.
+     - `until`: If set to `1` or `2`, waits for the `<select>` element to be ready.
+   - **Example:**
+     ```json
+     {
+       "id": "...",
+       "command": "select",
+       "target": "id=countryDropdown",
+       "value": "label=Italy"
+     }
+     ```
+
+### Category: Timer Management (Custom webautoma)
+
+5. **timerCreate**
+   - **Description:** Creates and initializes a new timer, without starting it. Useful for measuring times spanning multiple actions.
+   - **Parameters:**
+     - `target`: The unique ID to assign to the timer (e.g., loginTime).
+     - `value`: An optional description for the timer (reported in logs).
+
+6. **timerStart**
+   - **Description:** Starts (or restarts) a timer previously created with `timerCreate`. Records the start time.
+   - **Parameters:**
+     - `target`: The ID of the timer to start.
+     - `value`: Not used.
+
+7. **timerStop**
+   - **Description:** Stops a previously started timer. Records the interval elapsed since the last `timerStart` or `timerStop`. If value is "finalize", it finalizes the timer and writes the complete event to the JSON log; otherwise, it only records the partial interval.
+   - **Parameters:**
+     - `target`: The ID of the timer to stop.
+     - `value`: If set to `finalize` (case-insensitive), finalizes the timer. Otherwise, does nothing special besides stopping the current interval.
+
+8. **timerFinalize** (Alternative to timerStop with value=finalize)
+   - **Description:** Finalizes a timer, calculating the total elapsed time by summing all intervals recorded with `timerStop`. Writes the complete event to the JSON log. The timer can no longer be used after finalization.
+   - **Parameters:**
+     - `target`: The ID of the timer to finalize.
+     - `value`: Not used.
+
+### Category: Variable Stack Management (Custom webautoma)
+
+9. **stackAdd**
+   - **Description:** Finds an element, extracts some of its properties (text, tag, displayed/enabled status) and saves them in an internal map ("stack") associating them with the ID provided in the `id` field of the command. Useful for storing intermediate states or dynamic values.
+   - **Parameters:**
+     - `target`: The selector of the element to extract information from.
+     - `value`: Not used directly.
+     - `id`: (Standard command field) Important: This id is used as the key to store information in the stack.
+     - `until`: If set to `1`, waits for the element to be ready.
+
+10. **stackReset**
+    - **Description:** Completely clears the internal variable stack.
+    - **Parameters:** None used.
+
+11. **stackPrint**
+    - **Description:** Prints the current contents of the stack to the console (standard output) in indented JSON format. Useful for debugging.
+    - **Parameters:** None used.
+
+### Category: Flow Control & Utility
+
+12. **jump** (Custom webautoma)
+    - **Description:** Jumps execution to another command within the same test, identified by its `id`. Note: This is not a standard Selenium IDE command and makes the test flow harder to follow in the IDE itself.
+    - **Parameters:**
+       - `target`: The id of the command to jump to.
+       - `value`: Not used.
+
+13. **pause**
+    - **Description:** Suspends execution for a specified number of milliseconds.
+    - **Parameters:**
+       - `target`: The number of milliseconds to suspend execution for.
+       - `value`: Not used.
+
+14. **humanWait** (Custom webautoma)
+    - **Description:** Introduces a "human" pause, i.e., a random variable duration pause based on a configurable base value (`-humanWait` parameter or `executor.humanWaitBase` in code). If a value is provided in the command's `value`, it uses that as a fixed duration in milliseconds.
+    - **Parameters:**
+       - `target`: Not used.
+       - `value`: Fixed duration of the pause in milliseconds (optional). If omitted, uses the random pause based on humanWaitBase.
+
+### Category: Assertions and Verifications
+
+15. **assert**
+    - **Description:** Verifies that the visible text of an element exactly matches the provided value. Fails if the text is different.
+    - **Parameters:**
+       - `target`: The selector of the element whose text needs to be verified.
+       - `value`: The exact text expected to be found in the element. Supports variables `{{.variable}}`.
+       - `until`: (Optional) If set to `1` or `2`, waits for the element to be ready before verifying.
+
+16. **exists**
+    - **Description:** Verifies that a specified element exists in the DOM and is ready (visible and enabled) within the configured timeout. Fails if the element is not found or does not become ready.
+    - **Parameters:**
+       - `target`: The selector of the element to search for.
+       - `value`: Not used.
+       - `until`: (Optional) If set to `1` or `2`, actively waits for the element to exist and be ready for the duration of the timeout.
+
+17. **until** (Custom webautoma)
+    - **Description:** Waits until a specified element is *no longer* present or *no longer* ready (visible/enabled) on the page, or until the timeout expires. Useful for waiting for temporary elements (e.g., loading messages) to disappear. Fails if the element remains present and ready at the end of the timeout.
+    - **Parameters:**
+       - `target`: The selector of the element to monitor.
+       - `value`: Not used.
+       - `until`: (Optional, but **recommended to set to 1** for this command) If `1`, waits for the element to *not* be ready/present.
+
+### Category: Window/Frame/Alert Management
+
+18. **setWindowSize**
+    - **Description:** Resizes the current window to the specified dimensions.
+    - **Parameters:**
+       - `target`: The desired size in "WidthxHeight" format (e.g., "1280x720").
+
+19. **selectWindow** (Custom webautoma)
+    - **Description:** Moves the driver focus to a specific window or tab. Can use the direct WebDriver handle, a name previously assigned with `storeWindowHandle` (using `${handleName}` syntax), or a numeric index.
+    - **Parameters:**
+       - `target`: The window identifier (`handle=...`, `${savedName}`).
+
+20. **selectWindowMain** (Custom webautoma)
+    - **Description:** Brings focus back to the main/initial window (the one opened at startup or set with `setWindowMain`).
+
+21. **selectWindowTitle** (Custom webautoma)
+    - **Description:** Moves focus to the first window/tab whose title matches (partially, exactly, or via regex) the specified `value`.
+    - **Parameters:**
+       - `target`: Title matching mode (`contains`, `exact`, `regexp`).
+       - `value`: The title text (or regular expression) to search for.
+
+22. **closeWindow** (Custom webautoma)
+    - **Description:** Closes the *currently* focused window or tab. Cannot close the main/initial window.
+
+23. **storeWindowHandle** (Custom webautoma)
+    - **Description:** Saves the currently focused window handle, associating it with a symbolic name. This name can later be used in `selectWindow` or `close`.
+
+24. **windowHandles** (Custom webautoma, Debug)
+    - **Description:** Prints the list of handles for all currently open windows to the console.
+
+25. **close** (Custom webautoma)
+    - **Description:** Closes a specific window identified by its handle or a previously saved name.
+    - **Parameters:**
+       - `target`: The identifier of the window to close (e.g., `${popup}`).
+
+26. **setWindowMain** (Custom webautoma)
+    - **Description:** Sets the *currently* focused window handle as the new "main" or "root" window for `webautoma`.
+
+### Category: Frame Management
+
+27. **selectFrame**
+    - **Description:** Moves focus to a frame (or iframe) within the current page.
+    - **Parameters:**
+       - `target`: Frame identifier (`index=N`, `relative=parent`, `relative=top`, or element Name/ID).
+
+28. **selectParentFrame**
+    - **Description:** Moves focus from the current frame to its direct parent frame. Equivalent to `selectFrame` with `target=relative=parent`.
+
+### Category: Alert Management
+
+29. **selectAlert** (Custom webautoma)
+    - **Description:** Handles a JavaScript alert (`alert()`, `confirm()`, `prompt()`) appearing on the page. Reads the alert text (for logging) and then accepts or dismisses it.
+    - **Parameters:**
+       - `value`: `1` to accept, `0` or omitted to dismiss/cancel.
+
+### Category: Advanced Interactions (Mouse)
+
+30. **rightClick**
+    - **Description:** Simulates a right mouse click on the specified element. Waits for the element to be ready.
+    - **Parameters:**
+       - `target`: The selector of the element to right-click on.
+       - `until`: (Optional) If `1` or `2`, waits for the element to be ready.
+
+31. **doubleClick**
+    - **Description:** Simulates a double left mouse click on the specified element. Waits for the element to be ready.
+
+32. **mouseOver**
+    - **Description:** Moves the mouse cursor over the specified element, potentially triggering hover effects or tooltips. Waits for the element to be ready.
+
+33. **mouseOut**
+    - **Description:** Simulates the mouse leaving the area of the specified element. **Note:** In the current code (`doMouse`), this command doesn't seem to execute specific actions on the WebDriver.
+
+34. **mouseDownAt**
+    - **Description:** Simulates pressing (without releasing) the left mouse button on the specified element, potentially at relative coordinates. Starts a drag operation.
+    - **Parameters:**
+       - `target`: The selector of the element to press the mouse on.
+       - `value`: (Optional) Relative coordinates to the top-left corner of the element, format "X,Y". If omitted, presses in the center.
+
+35. **mouseMoveAt**
+    - **Description:** Moves the mouse while the left button is held down (started with `mouseDownAt`). Used for dragging. **Requires** a previous `mouseDownAt`.
+    - **Parameters:**
+       - `value`: Relative coordinates to the top-left corner of the *original* element from `mouseDownAt`, format "X,Y". Indicates the position *to which* to move the mouse.
+
+36. **mouseMultipleMoveAt** (Custom webautoma)
+    - **Description:** Similar to `mouseMoveAt`, but executes a sequence of consecutive relative movements while the button is pressed. Useful for simulating dragging along a path. **Requires** a previous `mouseDownAt`.
+    - **Parameters:**
+       - `value`: Sequence of *incremental* relative coordinates, separated by `|`. Each "X,Y" pair is relative to the *previous position*. Format: "dX1,dY1|dX2,dY2|...".
+
+37. **mouseUpAt**
+    - **Description:** Simulates releasing the left mouse button, completing a drag and drop operation. **Requires** a previous `mouseDownAt`.
+    - **Parameters:**
+       - `value`: (Optional) Relative coordinates to the top-left corner of the *original* element from `mouseDownAt`, indicating the *final* release position.
+
+### Category: Advanced Interactions (Keyboard - Custom webautoma)
+
+38. **actionsSendKeys** (Custom webautoma)
+    - **Description:** Sends a special key press (non-alphanumeric) or a simple sequence to the active element on the page. Useful for simulating Enter, Tab, Arrow keys, etc.
+    - **Parameters:**
+       - `value`: The name of the special key (e.g., `Enter`, `Tab`, `ArrowDown`, `Control`, `Alt`, `Shift`, `F5`, etc.) or a sequence of simple characters.
 
-Campi Principali:
-
-- id: Identificatore univoco del passo nel test (standard Selenium IDE).
-- command: Il nome del comando webautoma da eseguire (vedi sotto).
-- target: L'oggetto dell'azione (es. selettore CSS/XPath, URL, ID timer, nome variabile). Supporta il templating {{.variabile}}.
-- value: Il valore associato al comando (es. testo da scrivere, valore atteso, opzioni specifiche). Supporta il templating {{.variabile}}.
-
-Campi Specifici webautoma (Opzionali):
-
-- until: Usato da assert, exists, until. Indica una condizione di attesa (es. 1 per attendere che l'elemento sia pronto - visibile e abilitato).
-- windowHandleName, windowTimeout, opensWindow: Usati per la gestione avanzata delle finestre/tab (vedi comandi specifici).
-- x, y, offsetX, offsetY: Usati per comandi che richiedono coordinate o offset (es. scroll, scrollTo).
-
-Comandi Supportati
-
-Ecco l'elenco dei comandi riconosciuti da webautoma:
-
-    Categoria: Navigazione
-
-    1. open
-       - Descrizione: Apre un URL nel browser o naviga verso un percorso relativo all'URL base corrente.
-       - Parametri:
-         - target: L'URL completo (es. https://google.com) o un percorso relativo (es. /pagina). Se relativo, viene aggiunto all'url base definito nel file .side o all'ultimo URL base noto.
-         - value: Non utilizzato.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "open",
-           "target": "https://www.google.com",
-           "value": ""
-         }
-
-    Categoria: Interazione con Elementi
-
-    2. click
-       - Descrizione: Simula un click del mouse sull'elemento specificato. Attende che l'elemento sia pronto (visibile e abilitato) prima di cliccare.
-       - Parametri:
-         - target: Il selettore dell'elemento da cliccare (es. id=myButton, css=.submit-btn).
-         - value: Non utilizzato.
-         - until: Se impostato a 1 o 2, attende che l'elemento sia pronto prima del click.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "click",
-           "target": "id=loginButton",
-           "value": "",
-           "until": "1"
-         }
-
-    3. type
-       - Descrizione: Inserisce del testo in un campo input o textarea. Simula la digitazione carattere per carattere con un piccolo ritardo (vedi humanWait).
-       - Parametri:
-         - target: Il selettore dell'elemento in cui scrivere (es. id=username, name=password).
-         - value: Il testo da inserire. Supporta variabili (es. {{.mioUsername}}).
-         - until: Se impostato a 1 o 2, attende che l'elemento sia pronto prima di scrivere.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "type",
-           "target": "id=searchField",
-           "value": "Testo da cercare"
-         }
-         {
-           "id": "...",
-           "command": "type",
-           "target": "name=password",
-           "value": "{{.userPassword}}"
-         }
-
-    4. select
-       - Descrizione: Seleziona un'opzione da un elemento <select> (dropdown) basandosi sul testo visibile dell'opzione (label).
-       - Parametri:
-         - target: Il selettore dell'elemento <select>.
-         - value: La stringa label=Testo Dell'Opzione che identifica l'opzione da selezionare.
-         - until: Se impostato a 1 o 2, attende che l'elemento <select> sia pronto.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "select",
-           "target": "id=countryDropdown",
-           "value": "label=Italia"
-         }
-
-    Categoria: Gestione Timer (Custom webautoma)
-
-    5. timerCreate
-       - Descrizione: Crea e inizializza un nuovo timer, senza farlo partire. Utile per misurare tempi composti da più azioni.
-       - Parametri:
-         - target: L'ID univoco da assegnare al timer (es. loginTime).
-         - value: Una descrizione opzionale per il timer (riportata nei log).
-       - Esempio:
-         {
-           "id": "...",
-           "command": "timerCreate",
-           "target": "pageLoadTimer",
-           "value": "Tempo caricamento pagina iniziale"
-         }
-
-    6. timerStart
-       - Descrizione: Avvia (o riavvia) un timer precedentemente creato con timerCreate. Registra il tempo di inizio.
-       - Parametri:
-         - target: L'ID del timer da avviare.
-         - value: Non utilizzato.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "timerStart",
-           "target": "pageLoadTimer",
-           "value": ""
-         }
-
-    7. timerStop
-       - Descrizione: Ferma un timer precedentemente avviato. Registra l'intervallo trascorso dall'ultimo timerStart o timerStop. Se value è "finalize", finalizza il timer e scrive l'evento completo nel log JSON; altrimenti, registra solo l'intervallo parziale.
-       - Parametri:
-         - target: L'ID del timer da fermare.
-         - value: Se impostato a finalize (case-insensitive), finalizza il timer. Altrimenti, non fa nulla di speciale oltre a fermare l'intervallo corrente.
-       - Esempio (Stop parziale):
-         {
-           "id": "...",
-           "command": "timerStop",
-           "target": "userActionTimer",
-           "value": ""
-         }
-       - Esempio (Stop e Finalize):
-         {
-           "id": "...",
-           "command": "timerStop",
-           "target": "totalTestTimer",
-           "value": "finalize"
-         }
-
-    8. timerFinalize (Alternativa a timerStop con value=finalize)
-       - Descrizione: Finalizza un timer, calcolando il tempo totale trascorso sommando tutti gli intervalli registrati con timerStop. Scrive l'evento completo nel log JSON. Il timer non può più essere usato dopo la finalizzazione.
-       - Parametri:
-         - target: L'ID del timer da finalizzare.
-         - value: Non utilizzato.
-       - Esempio:
-         {
-           "id": "...",
-           "command": "timerFinalize",
-           "target": "loginProcessTimer",
-           "value": ""
-         }
-
-    Categoria: Gestione Stack Variabili (Custom webautoma)
-
-    9. stackAdd
-       - Descrizione: Trova un elemento, ne estrae alcune proprietà (testo, tag, stato visualizzato/abilitato) e le salva in una mappa interna ("stack") associandole all'ID fornito nel campo id del comando. Utile per memorizzare stati intermedi o valori dinamici.
-       - Parametri:
-         - target: Il selettore dell'elemento da cui estrarre le informazioni.
-         - value: Non utilizzato direttamente.
-         - id: (Campo standard del comando) Importante: Questo id viene usato come chiave per memorizzare le informazioni nello stack.
-         - until: Se impostato a 1, attende che l'elemento sia pronto.
-       - Esempio:
-         {
-           "id": "userInfo", // Questo ID sarà la chiave nello stack
-           "command": "stackAdd",
-           "target": "id=userDetails",
-           "value": "",
-           "until": "1"
-         }
-
-    10. stackReset
-        - Descrizione: Cancella completamente lo stack interno delle variabili.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "stackReset",
-            "target": "",
-            "value": ""
-          }
-
-    11. stackPrint
-        - Descrizione: Stampa il contenuto corrente dello stack sulla console (output standard) in formato JSON indentato. Utile per debugging.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "stackPrint",
-            "target": "",
-            "value": ""
-          }
-
-    Categoria: Controllo Flusso & Utility
-
-    12. jump (Custom webautoma)
-        - Descrizione: Salta l'esecuzione a un altro comando all'interno dello stesso test, identificato dal suo id. Nota: Questo non è un comando standard Selenium IDE e rende il flusso del test più difficile da seguire nell'IDE stesso.
-        - Parametri:
-          - target: L'id del comando a cui saltare.
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "jump",
-            "target": "inizioCiclo", // Salta al comando con id "inizioCiclo"
-            "value": ""
-          }
-
-    13. pause
-        - Descrizione: Sospende l'esecuzione per un numero specificato di millisecondi.
-        - Parametri:
-          - target: Il numero di millisecondi per cui sospendere l'esecuzione.
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "pause",
-            "target": "5000", // Pausa per 5 secondi
-            "value": ""
-          }
-
-    14. humanWait (Custom webautoma)
-        - Descrizione: Introduce una pausa "umana", ovvero una pausa di durata variabile casuale basata su un valore base configurabile (parametro -humanWait o executor.humanWaitBase nel codice). Se viene fornito un valore nel value del comando, usa quello come durata fissa in millisecondi.
-        - Parametri:
-          - target: Non utilizzato.
-          - value: Durata fissa della pausa in millisecondi (opzionale). Se omesso, usa la pausa casuale basata su humanWaitBase.
-        - Esempio (Pausa casuale):
-          {
-            "id": "...",
-            "command": "humanWait",
-            "target": "",
-            "value": ""
-          }
-        - Esempio (Pausa fissa):
-          {
-            "id": "...",
-            "command": "humanWait",
-            "target": "",
-            "value": "1500" // Pausa fissa di 1.5 secondi
-          }
-		  
-		  Categoria: Asserzioni e Verifiche
-
-    15. assert
-        - Descrizione: Verifica che il testo visibile di un elemento corrisponda esattamente al valore fornito. Fallisce se il testo è diverso.
-        - Parametri:
-          - target: Il selettore dell'elemento il cui testo deve essere verificato (es. id=messaggioErrore, css=.risultato).
-          - value: Il testo esatto che ci si aspetta di trovare nell'elemento. Supporta variabili {{.variabile}}.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento sia pronto (visibile e abilitato) prima di effettuare la verifica.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "assert",
-            "target": "id=statusMessage",
-            "value": "Operazione completata.",
-            "until": "1"
-          }
-
-    16. exists
-        - Descrizione: Verifica che un elemento specificato esista nel DOM e sia pronto (visibile e abilitato) entro il timeout configurato. Fallisce se l'elemento non viene trovato o non diventa pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento da cercare (es. id=confermaPopup, css=button.primary).
-          - value: Non utilizzato.
-          - until: (Opzionale) Se impostato a 1 o 2, attende attivamente che l'elemento esista e sia pronto per la durata del timeout. Se omesso (o 0), verifica solo se l'elemento è presente e pronto nello stato attuale della pagina (meno comune per verifiche robuste).
-        - Esempio:
-          {
-            "id": "...",
-            "command": "exists",
-            "target": "css=.loading-spinner",
-            "value": "",
-            "until": "1" // Attende che lo spinner sia visibile/abilitato
-          }
-
-    17. until (Custom webautoma?)
-        - Descrizione: Attende fino a quando un elemento specificato *non* è più presente o *non* è più pronto (visibile/abilitato) sulla pagina, oppure fino allo scadere del timeout. Utile per aspettare la scomparsa di elementi temporanei (es. messaggi di caricamento). Fallisce se l'elemento rimane presente e pronto alla fine del timeout.
-        - Parametri:
-          - target: Il selettore dell'elemento da monitorare per la sua scomparsa o inattività.
-          - value: Non utilizzato.
-          - until: (Opzionale, ma **consigliato impostarlo a 1** per questo comando) Se 1, attende che l'elemento *non* sia pronto/presente. Se 0 o 2, attende che sia pronto, ma il comando fallirà se l'elemento *è* effettivamente pronto (uso meno intuitivo).
-        - Esempio:
-          {
-            "id": "...",
-            "command": "until",
-            "target": "css=.loading-indicator",
-            "value": "",
-            "until": "1" // Attende che l'indicatore di caricamento scompaia o diventi non pronto
-          }
-		  Categoria: Gestione Finestre/Frame/Alert
-
-    18. setWindowSize
-        - Descrizione: Ridimensiona la finestra corrente alle dimensioni specificate.
-        - Parametri:
-          - target: La dimensione desiderata nel formato "LarghezzaxAltezza" (es. "1280x720").
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "setWindowSize",
-            "target": "1920x1080",
-            "value": ""
-          }
-
-    19. selectWindow (Custom webautoma?)
-        - Descrizione: Sposta il focus del driver su una finestra o tab specifico. Può usare l'handle diretto del WebDriver, un nome assegnato precedentemente con `storeWindowHandle` (usando la sintassi `${nomeHandle}`), o un indice numerico (meno comune/affidabile).
-        - Parametri:
-          - target: L'identificatore della finestra. Formati possibili:
-              - `handle=NOME_HANDLE_WEBDRIVER` (raramente usato manualmente)
-              - `${nomeHandleSalvato}` (nome assegnato con `storeWindowHandle`)
-              - Potenzialmente un indice numerico (da verificare nel codice WebDriver)
-          - value: Non utilizzato.
-        - Esempio (usando un handle salvato):
-          {
-            "id": "...",
-            "command": "selectWindow",
-            "target": "${finestraPrincipale}",
-            "value": ""
-          }
-
-    20. selectWindowMain (Custom webautoma)
-        - Descrizione: Riporta il focus sulla finestra principale/iniziale (quella aperta all'avvio o impostata con `setWindowMain`).
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "selectWindowMain",
-            "target": "",
-            "value": ""
-          }
-
-    21. selectWindowTitle (Custom webautoma)
-        - Descrizione: Sposta il focus sulla prima finestra/tab il cui titolo corrisponde (parzialmente, esattamente, o tramite regex) al `value` specificato.
-        - Parametri:
-          - target: Modalità di confronto del titolo (Opzionale, default: `contains`):
-              - `contains`: Il titolo della finestra contiene `value` (case-insensitive).
-              - `exact`: Il titolo della finestra è esattamente `value`.
-              - `regexp`: Il titolo della finestra matcha l'espressione regolare in `value`.
-          - value: Il testo del titolo (o l'espressione regolare) da cercare.
-        - Esempio (Contains):
-          {
-            "id": "...",
-            "command": "selectWindowTitle",
-            "target": "contains", // o omesso
-            "value": "Pagina Risultati"
-          }
-        - Esempio (Regexp):
-          {
-            "id": "...",
-            "command": "selectWindowTitle",
-            "target": "regexp",
-            "value": "^Carrello \\(\\d+\\)$" // Es: Titolo "Carrello (3)"
-          }
-
-    22. closeWindow (Custom webautoma)
-        - Descrizione: Chiude la finestra o il tab *attualmente* in focus. Non può chiudere la finestra principale/iniziale. Dopo la chiusura, il focus *non* viene spostato automaticamente; usare `selectWindowMain` o un altro comando `selectWindow*` se necessario.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "closeWindow",
-            "target": "",
-            "value": ""
-          }
-
-    23. storeWindowHandle (Custom webautoma)
-        - Descrizione: Salva l'handle della finestra attualmente in focus associandolo a un nome simbolico. Questo nome può essere usato successivamente in `selectWindow` o `close` con la sintassi `${nomeHandle}`.
-        - Parametri:
-          - target: Il nome da assegnare all'handle della finestra corrente (es. `finestraLogin`, `popupDettaglio`).
-          - value: Non utilizzato.
-        - Campi Specifici: Può utilizzare `windowHandleName` (ridondante?), `windowTimeout`, `opensWindow` per gestire l'attesa dell'apertura di una nuova finestra prima di salvarne l'handle (se `opensWindow` è `true`).
-        - Esempio (Salvataggio handle corrente):
-          {
-            "id": "...",
-            "command": "storeWindowHandle",
-            "target": "mainWindow", // Salva l'handle corrente come "mainWindow"
-            "value": ""
-          }
-        - Esempio (Attesa e salvataggio popup):
-          {
-            "id": "...",
-            "command": "storeWindowHandle",
-            "target": "finestraPopup",
-            "value": "",
-            "opensWindow": true,
-            "windowTimeout": 5000 // Attende fino a 5s che appaia una nuova finestra
-          }
-
-    24. windowHandles (Custom webautoma, Debug)
-        - Descrizione: Stampa sulla console (output standard) l'elenco degli handle di tutte le finestre attualmente aperte. Utile principalmente per debugging.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "windowHandles",
-            "target": "",
-            "value": ""
-          }
-
-    25. close (Custom webautoma)
-        - Descrizione: Chiude una specifica finestra identificata dal suo handle o da un nome precedentemente salvato con `storeWindowHandle`. A differenza di `closeWindow`, questo comando richiede l'identificatore della finestra da chiudere.
-        - Parametri:
-          - target: L'identificatore della finestra da chiudere (es. `${popup}`, `handle=HANDLE_ID`).
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "close",
-            "target": "${finestraDaChiudere}",
-            "value": ""
-          }
-
-    26. setWindowMain (Custom webautoma)
-        - Descrizione: Imposta l'handle della finestra *attualmente* in focus come la nuova finestra "principale" o "root" per `webautoma`. Utile se il flusso di lavoro si sposta permanentemente su una nuova finestra principale.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "setWindowMain",
-            "target": "",
-            "value": ""
-          }
-
-    Categoria: Gestione Frame
-
-    27. selectFrame
-        - Descrizione: Sposta il focus su un frame (o iframe) all'interno della pagina corrente.
-        - Parametri:
-          - target: Identificatore del frame:
-              - `index=N`: Indice numerico del frame (base 0).
-              - `relative=parent`: Passa al frame genitore.
-              - `relative=top`: Passa al contesto principale della pagina (fuori da tutti i frame).
-              - Stringa: Nome o ID dell'elemento (i)frame.
-              - Vuoto: Resetta al contesto principale della pagina (equivalente a `relative=top`).
-          - value: Non utilizzato.
-        - Esempio (Per indice):
-          {
-            "id": "...",
-            "command": "selectFrame",
-            "target": "index=0",
-            "value": ""
-          }
-        - Esempio (Per ID/Nome):
-          {
-            "id": "...",
-            "command": "selectFrame",
-            "target": "contentFrame",
-            "value": ""
-          }
-
-    28. selectParentFrame
-        - Descrizione: Sposta il focus dal frame corrente al suo frame genitore diretto. Equivalente a `selectFrame` con `target=relative=parent`.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "selectParentFrame",
-            "target": "",
-            "value": ""
-          }
-
-    Categoria: Gestione Alert
-
-    29. selectAlert (Custom webautoma?)
-        - Descrizione: Gestisce un alert JavaScript (popup `alert()`, `confirm()`, `prompt()`) che appare sulla pagina. Legge il testo dell'alert (per log) e poi lo accetta o lo chiude.
-        - Parametri:
-          - target: Non utilizzato.
-          - value: Determina l'azione:
-              - `1`: Accetta l'alert (es. preme "OK" in `confirm`).
-              - `0` o omesso: Chiude/Annulla l'alert (es. preme "Annulla" in `confirm`).
-        - Esempio (Accetta):
-          {
-            "id": "...",
-            "command": "selectAlert",
-            "target": "",
-            "value": "1"
-          }
-        - Esempio (Chiude):
-          {
-            "id": "...",
-            "command": "selectAlert",
-            "target": "",
-            "value": "0" // o omesso
-          }
-
-Categoria: Interazioni Avanzate (Mouse)
-
-    30. rightClick
-        - Descrizione: Simula un click con il tasto destro del mouse sull'elemento specificato. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui fare click destro.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "rightClick",
-            "target": "id=contextMenuArea",
-            "value": "",
-            "until": "1"
-          }
-
-    31. doubleClick
-        - Descrizione: Simula un doppio click con il tasto sinistro del mouse sull'elemento specificato. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui fare doppio click.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "doubleClick",
-            "target": "css=div.editable",
-            "value": "",
-            "until": "1"
-          }
-
-    32. mouseOver
-        - Descrizione: Sposta il cursore del mouse sopra l'elemento specificato, potenzialmente attivando effetti hover o tooltip. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui spostare il mouse.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseOver",
-            "target": "id=menuItem",
-            "value": "",
-            "until": "1"
-          }
-
-    33. mouseOut
-        - Descrizione: Simula l'evento del mouse che esce dall'area dell'elemento specificato. **Nota:** Nel codice attuale (`doMouse`), questo comando non sembra eseguire azioni specifiche sul WebDriver.
-        - Parametri:
-          - target: Il selettore dell'elemento da cui il mouse "esce".
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseOut",
-            "target": "id=menuItem",
-            "value": ""
-          }
-
-    34. mouseDownAt
-        - Descrizione: Simula la pressione (senza rilascio) del tasto sinistro del mouse sull'elemento specificato, potenzialmente a coordinate relative. Inizia un'operazione di trascinamento (drag).
-        - Parametri:
-          - target: Il selettore dell'elemento su cui premere il mouse.
-          - value: (Opzionale) Coordinate relative all'angolo in alto a sinistra dell'elemento, formato "X,Y" (es. "10,15"). Se omesso, preme al centro (o default del driver).
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseDownAt",
-            "target": "id=draggableElement",
-            "value": "5,5", // Premi vicino all'angolo in alto a sinistra
-            "until": "1"
-          }
-
-    35. mouseMoveAt
-        - Descrizione: Sposta il mouse mentre il tasto sinistro è tenuto premuto (iniziato con `mouseDownAt`). Usato per il trascinamento (drag). **Richiede** un `mouseDownAt` precedente sullo stesso elemento implicito.
-        - Parametri:
-          - target: (Generalmente ignorato, agisce sull'elemento del `mouseDownAt`).
-          - value: Coordinate relative all'angolo in alto a sinistra dell'elemento *originale* del `mouseDownAt`, formato "X,Y". Indica la posizione *a cui* spostare il mouse.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseMoveAt",
-            "target": "", // Target non necessario qui
-            "value": "100,50" // Sposta il mouse a 100px destra, 50px sotto dall'origine del drag
-          }
-
-    36. mouseMultipleMoveAt (Custom webautoma)
-        - Descrizione: Simile a `mouseMoveAt`, ma esegue una sequenza di spostamenti relativi consecutivi mentre il tasto è premuto. Utile per simulare un trascinamento lungo un percorso. **Richiede** un `mouseDownAt` precedente.
-        - Parametri:
-          - target: (Generalmente ignorato).
-          - value: Sequenza di coordinate relative *incrementali*, separate da `|`. Ogni coppia "X,Y" è relativa alla *posizione precedente*. Formato: "dX1,dY1|dX2,dY2|...".
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseMultipleMoveAt",
-            "target": "",
-            "value": "50,0|0,50|-50,0" // Sposta 50px a destra, poi 50px in basso, poi 50px a sinistra
-          }
-
-    37. mouseUpAt
-        - Descrizione: Simula il rilascio del tasto sinistro del mouse, completando un'operazione di trascinamento (drag and drop). **Richiede** un `mouseDownAt` precedente.
-        - Parametri:
-          - target: (Generalmente ignorato, agisce sull'elemento del `mouseDownAt`).
-          - value: (Opzionale) Coordinate relative all'angolo in alto a sinistra dell'elemento *originale* del `mouseDownAt`, formato "X,Y". Indica la posizione *finale* in cui rilasciare il mouse. Se omesso, rilascia nella posizione corrente.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "mouseUpAt",
-            "target": "",
-            "value": "200,100" // Rilascia il mouse a 200px destra, 100px sotto dall'origine del drag
-          }
-
-    Categoria: Interazioni Avanzate (Tastiera - Custom webautoma)
-
-    38. actionsSendKeys (Custom webautoma)
-        - Descrizione: Invia la pressione di un tasto speciale (non alfanumerico) o una sequenza semplice all'elemento attivo nella pagina. Utile per simulare Invio, Tab, Frecce direzionali, ecc.
-        - Parametri:
-          - target: (Generalmente non usato, agisce sull'elemento attivo).
-          - value: Il nome del tasto speciale (es. `Enter`, `Tab`, `ArrowDown`, `Control`, `Alt`, `Shift`, `F5`, etc. - vedi `wd/base/keys.go` per la lista completa dei nomi mappati) oppure una sequenza di caratteri semplici. Il mapping cerca `KeyFromMapping` in `base/keys.go` per i nomi speciali.
-        - Esempio (Invio):
-          {
-            "id": "...",
-            "command": "actionsSendKeys",
-            "target": "",
-            "value": "Enter"
-          }
-        - Esempio (Freccia Giù):
-          {
-            "id": "...",
-            "command": "actionsSendKeys",
-            "target": "",
-            "value": "ArrowDown"
-          }
-        - Esempio (Combinazione? - Da verificare se funziona come atteso):
-          {
-            "id": "...",
-            "command": "actionsSendKeys",
-            "target": "",
-            "value": "Control+a" // Potrebbe richiedere comandi separati KeyDown/KeyUp
-          }
-
-    39. keys (Custom webautoma)
-        - Descrizione: Permette di definire sequenze complesse di interazioni da tastiera, includendo pressione (`press`), rilascio (`release`) e pause (`pause`). Utile per simulare combinazioni di tasti (es. Ctrl+C) o comportamenti specifici.
-        - Parametri:
-          - target: (Opzionale) Selettore dell'elemento a cui inviare gli eventi. Se omesso, invia all'elemento attivo.
-          - value: Stringa formattata che descrive la sequenza, separata da virgola. Ogni elemento è `azione:valore`.
-              - `press:KEY`: Simula la pressione di un tasto (es. `press:Control`, `press:c`). Usa `KeyFromMapping` per i tasti speciali.
-              - `release:KEY`: Simula il rilascio di un tasto (es. `release:Control`, `release:c`).
-              - `pause:MS`: Inserisce una pausa in millisecondi (es. `pause:100`).
-        - Esempio (Ctrl+A, Ctrl+C):
-          {
-            "id": "...",
-            "command": "keys",
-            "target": "id=myTextArea",
-            "value": "press:Control,press:a,release:a,pause:50,press:c,release:c,release:Control"
-          }
-        - Esempio (Scrivere "test" tenendo premuto Shift):
-          {
-            "id": "...",
-            "command": "keys",
-            "target": "id=myInput",
-            "value": "press:Shift,press:t,release:t,press:e,release:e,press:s,release:s,press:t,release:t,release:Shift"
-          }
-		  
-		  Categoria: File & Download (Custom webautoma)
-
-    40. download
-        - Descrizione: Scarica un file direttamente da un URL specificato e lo salva nel percorso locale indicato. Utilizza i cookie di sessione correnti del browser per gestire eventuali autenticazioni richieste dal server per il download.
-        - Parametri:
-          - target: L'URL completo da cui scaricare il file. Se l'URL inizia con '/', viene considerato relativo all'URL base della pagina corrente (ottenuto dall'ultimo comando 'open' o navigazione). Supporta variabili {{.variabile}}.
-          - value: Il percorso completo, incluso il nome del file, dove salvare il file scaricato sul sistema locale (es. `/percorso/locale/nomefile.pdf` o `C:\Download\report.xlsx`). Supporta variabili {{.variabile}}.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "download",
-            "target": "https://example.com/resources/documento.zip",
-            "value": "/home/utente/download/archivio.zip"
-          }
-          {
-            "id": "...",
-            "command": "download",
-            "target": "/api/export?id={{.reportId}}", // Relativo all'URL base
-            "value": "report_{{.reportId}}.csv"
-          }
-
-    41. clickDownload
-        - Descrizione: Trova un elemento sulla pagina (solitamente un link `<a>`), ne estrae l'URL dall'attributo `href`, quindi scarica il file da quell'URL nel percorso locale specificato. Utile quando l'URL del download è dinamico o non noto a priori. Utilizza i cookie di sessione correnti.
-        - Parametri:
-          - target: Il selettore dell'elemento (es. link `<a>`) che contiene l'attributo `href` con l'URL del file da scaricare.
-          - value: Il percorso completo, incluso il nome del file, dove salvare il file scaricato sul sistema locale. Supporta variabili {{.variabile}}.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento sia pronto prima di tentare di leggerne l'attributo `href`.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "clickDownload",
-            "target": "css=a.download-link[data-file='report']",
-            "value": "/tmp/report_scaricato.pdf",
-            "until": "1"
-          }
-
-Categoria: Scrolling (Custom webautoma)
-
-    42. scroll
-        - Descrizione: Esegue uno scroll della pagina (viewport) o a partire da un elemento specifico, di una determinata quantità (delta X, delta Y). Utile per spostare la visuale di una quantità fissa. Può simulare uno scroll fluido suddividendolo in passi con pause intermedie. Utilizza l'Actions API del WebDriver (simulazione rotellina/touchpad).
-        - Parametri:
-          - target: (Opzionale) Il selettore dell'elemento da cui calcolare il punto di partenza dello scroll. Se omesso, lo scroll parte dalle coordinate specificate nei campi `x`/`y` del comando (default 0,0) più eventuali `offsetX`/`offsetY`.
-          - value: Specifica lo spostamento (delta) e opzionalmente i passi e l'intervallo. Formato: "DeltaX,DeltaY[,NumeroPassi,IntervalloMs]".
-              - DeltaX, DeltaY: Pixel di spostamento orizzontale e verticale (negativi per sinistra/su, positivi per destra/giù).
-              - NumeroPassi: (Opzionale) Numero di passi in cui suddividere lo scroll totale.
-              - IntervalloMs: (Opzionale, richiede NumeroPassi) Millisecondi di pausa tra un passo e l'altro.
-          - x, y: (Opzionali, usati solo se `target` è omesso) Coordinate X, Y *assolute* nella viewport da cui inizia l'azione di scroll. Default: 0,0.
-          - offsetX, offsetY: (Opzionali) Offset in pixel da aggiungere alle coordinate di partenza (sia quelle `x`/`y` sia quelle calcolate dall'elemento `target`).
-        - Esempio (Scroll viewport di 500px in basso):
-          {
-            "id": "...",
-            "command": "scroll",
-            "target": "", // Scroll della viewport
-            "value": "0,500"
-          }
-        - Esempio (Scroll viewport fluido di 1000px in basso in 10 passi):
-          {
-            "id": "...",
-            "command": "scroll",
-            "target": "",
-            "value": "0,1000,10,50" // 10 passi, 50ms di pausa tra passi
-          }
-        - Esempio (Scroll partendo dal basso di un elemento header):
-          {
-            "id": "...",
-            "command": "scroll",
-            "target": "id=mainHeader",
-            "value": "0,300", // Scrolla 300px in basso
-            "offsetY": 50 // Partendo 50px sotto l'header
-          }
-
-    43. scrollTo
-        - Descrizione: Scrolla la pagina in modo che un punto specifico *all'interno* di un elemento target diventi visibile nella viewport. Se l'elemento non è inizialmente visibile, prova prima a portarlo in vista. Può simulare uno scroll fluido. Utilizza l'Actions API del WebDriver.
-        - Parametri:
-          - target: (Opzionale) Il selettore dell'elemento target verso cui scrollare. Se omesso, utilizza l'elemento attualmente attivo (quello con il focus).
-          - value: Specifica le coordinate *relative all'angolo in alto a sinistra dell'elemento target* e opzionalmente i passi e l'intervallo. Formato: "TargetX,TargetY[,NumeroPassi,IntervalloMs]".
-              - TargetX, TargetY: Coordinate X, Y *dentro* l'elemento target che si desidera portare in vista. "0,0" corrisponde all'angolo in alto a sinistra dell'elemento.
-              - NumeroPassi: (Opzionale) Numero di passi per raggiungere la posizione.
-              - IntervalloMs: (Opzionale, richiede NumeroPassi) Millisecondi di pausa tra i passi.
-          - offsetX, offsetY: (Opzionali) Offset in pixel da aggiungere alle coordinate `TargetX`, `TargetY` specificate in `value`.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento `target` sia pronto prima di tentare lo scroll.
-        - Esempio (Scrollare fino all'inizio di un footer):
-          {
-            "id": "...",
-            "command": "scrollTo",
-            "target": "id=pageFooter",
-            "value": "0,0", // Porta l'angolo 0,0 del footer in vista
-            "until": "1"
-          }
-        - Esempio (Scrollare fluidamente a un punto specifico dentro un div):
-          {
-            "id": "...",
-            "command": "scrollTo",
-            "target": "css=div.scrollable-content",
-            "value": "0,500,10,50" // Porta il punto Y=500 dentro il div in vista, in 10 passi
-          }
-
-Categoria: Custom Avanzati (webautoma)
-
-    44. otp
-        - Descrizione: Recupera un One-Time Password (OTP) da un account email. Si connette al server IMAP specificato, cerca l'email più recente che soddisfa i criteri (oggetto, età massima), estrae il codice OTP dal corpo dell'email tramite un'espressione regolare, e lo memorizza internamente. L'OTP recuperato può essere utilizzato nei comandi successivi (ad esempio 'type') usando la variabile `{{.otp}}`.
-        - Parametri:
-          - target: La stringa di connessione al server IMAP. Formato: `protocollo[authMode]://utente:password@server:porta`
-              - `protocollo`: Può essere `tls` (consigliato), `starttls`, o `insecure`.
-              - `[authMode]`: (Opzionale) Specificare `[oauth]` o `[oauth2]` se si utilizza l'autenticazione OAuth/OAuth2 invece della password diretta.
-              - `utente`: Nome utente per l'accesso IMAP.
-              - `password`: Password o token OAuth.
-              - `server`: Indirizzo del server IMAP.
-              - `porta`: Porta del server IMAP (es. 993 per TLS, 143 per StartTLS/Insecure).
-              - Esempio TLS: `tls://mia.email@example.com:LaMiaPassword@imap.example.com:993`
-              - Esempio OAuth2: `tls[oauth2]://utente@gmail.com:TokenDiAccessoOAuth2@imap.gmail.com:993`
-          - value: Stringa di configurazione per la ricerca e l'estrazione, con parametri separati da `|||`. Formato: `"RegExpOggetto|||RegExpCorpoConGruppoDiCatturaOTP[|||IntervalloVerificaSec[|||ValiditaEmailMin]]"`
-              - `RegExpOggetto`: Espressione regolare (Go standard) per identificare l'oggetto dell'email contenente l'OTP (es. `^Codice di verifica.*$`).
-              - `RegExpCorpoConGruppoDiCatturaOTP`: Espressione regolare (Go standard) applicata al corpo dell'email per estrarre l'OTP. **Deve** contenere un gruppo di cattura tra parentesi `()` che isoli esattamente il codice OTP (es. `Il tuo codice OTP è ([0-9]{6})\.`, cattura 6 cifre).
-              - `IntervalloVerificaSec`: (Opzionale, default: 60) Numero massimo di secondi durante i quali `webautoma` tenterà di recuperare l'email (controllando periodicamente la casella).
-              - `ValiditaEmailMin`: (Opzionale, default: 5) Età massima in minuti che l'email può avere per essere considerata valida.
-        - Risultato: L'OTP estratto viene salvato nella variabile interna `otp`, accessibile come `{{.otp}}` nei campi `value` dei comandi successivi.
-        - Esempio:
-          {
-            "id": "recuperaOTP",
-            "command": "otp",
-            "target": "tls://utente@example.com:passwordSegreta@imap.example.com:993",
-            "value": "Il tuo codice monouso Esempio Corp|||codice di verifica: ([A-Z0-9]+)|||90|||3"
-            // Cerca email con oggetto "Il tuo codice monouso Esempio Corp"
-            // Estrae un codice alfanumerico dal corpo (es. "codice di verifica: XY78Z1")
-            // Tenta per 90 secondi, email valide se più recenti di 3 minuti
-          }
-          {
-            "id": "inserisciOTP",
-            "command": "type",
-            "target": "id=otpField",
-            "value": "{{.otp}}" // Usa l'OTP recuperato nel passo precedente
-          }
-
-Categoria: Debug e Meta-Comandi (Custom webautoma)
-
-    45. disableError
-        - Descrizione: Disabilita temporaneamente l'interruzione dell'esecuzione in caso di errore nei comandi successivi. Utile per tentare azioni che potrebbero fallire senza bloccare l'intero test. L'errore verrà comunque loggato (a meno che non sia disabilitato anche il debug). Usare `enableError` per riattivare il comportamento normale.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "disableError",
-            "target": "",
-            "value": ""
-          }
-
-    46. enableError
-        - Descrizione: Riattiva l'interruzione dell'esecuzione in caso di errore, annullando l'effetto di un precedente `disableError`. Questo è il comportamento predefinito.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "enableError",
-            "target": "",
-            "value": ""
-          }
-
-    47. disableDebug
-        - Descrizione: Disabilita l'output di log dettagliato (livello debug) generato dall'adapter `webautoma` durante l'esecuzione.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "disableDebug",
-            "target": "",
-            "value": ""
-          }
-
-    48. enableDebug
-        - Descrizione: Riattiva l'output di log dettagliato (livello debug). Utile se è stato precedentemente disabilitato.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "enableDebug",
-            "target": "",
-            "value": ""
-          }
-
-    49. status
-        - Descrizione: Richiede e stampa sulla console (output standard) le informazioni di stato del server WebDriver (versione, OS, disponibilità). Utile per diagnosi.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "status",
-            "target": "",
-            "value": ""
-          }
-
-    50. execId
-        - Descrizione: Imposta un identificatore globale per l'intera esecuzione corrente. Questo ID verrà incluso nei log JSON generati, utile per correlare eventi di diverse esecuzioni.
-        - Parametri:
-          - target: La stringa da usare come ID dell'esecuzione.
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "execId",
-            "target": "run_produzione_sera",
-            "value": ""
-          }
-
-    51. probe
-        - Descrizione: Imposta un identificatore per la "sonda" o istanza specifica del test in corso. Questo ID verrà incluso nei log JSON, utile per distinguere i risultati quando più istanze dello stesso test girano in parallelo o per identificare specifici punti di monitoraggio.
-        - Parametri:
-          - target: La stringa da usare come ID della sonda/istanza.
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "probe",
-            "target": "monitor_login_roma",
-            "value": ""
-          }
-
-    52. setTimeout
-        - Descrizione: Imposta il tempo massimo (timeout implicito) in millisecondi che il WebDriver attenderà quando cerca un elemento (`findElement`, `findElements`) prima di restituire un errore "elemento non trovato".
-        - Parametri:
-          - target: Il tempo di attesa in millisecondi.
-          - value: Non utilizzato.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "setTimeout",
-            "target": "30000", // Imposta timeout a 30 secondi
-            "value": ""
-          }
-
-    53. activeElement (Debug)
-        - Descrizione: Identifica l'elemento attualmente attivo (quello con il focus) nella pagina e ne stampa i dettagli (tag, testo, stato) sulla console (output standard). Utile per debugging per capire dove si trova il focus della tastiera/interazione.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "activeElement",
-            "target": "",
-            "value": ""
-          }
-
-    54. pageSource (Debug)
-        - Descrizione: Recupera l'intero sorgente HTML della pagina attualmente visualizzata e lo stampa sulla console (output standard). Utile per debugging avanzato della struttura DOM.
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "pageSource",
-            "target": "",
-            "value": ""
-          }
-
-    55. noop
-        - Descrizione: Comando "No Operation". Non esegue alcuna azione. Può essere utile come segnaposto o per inserire commenti nel file `.side` (usando il campo `comment` standard di Selenium IDE, sebbene `webautoma` non lo legga attivamente, può essere utile per chi legge il file).
-        - Parametri: Non ne usa.
-        - Esempio:
-          {
-            "id": "...",
-            "command": "noop",
-            "target": "",
-            "value": "",
-            "comment": "Qui inizia la sezione di checkout"
-          }
-
-(Placeholder: Altri comandi da documentare)
-
-Sintassi Target/Selettori
-
-(Placeholder: Descrizione dettagliata dei formati supportati per target: id=, css=, xpath=, linkText=, name=, class=)
-
-Sintassi Value/Variabili
-
-(Placeholder: Spiegazione dell'uso di value e del templating {{.nomeVariabile}} per inserire valori dinamici)
-
-Console Interattiva (SAM)
-
-(Placeholder: Descrizione della console SAM, come avviarla, comandi disponibili, utilizzo per debugging)
-
-Modalità Server
-
-(Placeholder: Descrizione della modalità server, come avviarla, API, scopo)
-
-Funzionalità Avanzate
-
-(Placeholder: Dettagli su OTP via email, configurazione avanzata, gestione capabilities, cattura eventi di rete, ecc.)
-
-Troubleshooting
-
-(Placeholder: Errori comuni, interpretazione dei log, problemi noti)
+39. **keys** (Custom webautoma)
+    - **Description:** Allows defining complex sequences of keyboard interactions, including press (`press`), release (`release`), and pauses (`pause`). Useful for simulating key combinations (e.g., Ctrl+C).
+    - **Parameters:**
+       - `target`: (Optional) Selector of the element to send events to. If omitted, sends to the active element.
+       - `value`: Formatted string describing the sequence, comma-separated. Each item is `action:value`. (e.g., `press:Control,press:c,release:c,release:Control`).
+
+### Category: File & Download (Custom webautoma)
+
+40. **download**
+    - **Description:** Downloads a file directly from a specified URL and saves it to the indicated local path. Uses current browser session cookies to handle any server-required authentication.
+    - **Parameters:**
+       - `target`: The full URL to download the file from. Supports `{{.variable}}` variables.
+       - `value`: The full path, including filename, where to save the downloaded file locally. Supports `{{.variable}}` variables.
+
+41. **clickDownload**
+    - **Description:** Finds an element on the page (usually an `<a>` link), extracts its URL from the `href` attribute, then downloads the file from that URL to the specified local path. Useful when the download URL is dynamic.
+    - **Parameters:**
+       - `target`: The selector of the element containing the `href` attribute with the file URL.
+       - `value`: The full local save path.
+
+### Category: Scrolling (Custom webautoma)
+
+42. **scroll**
+    - **Description:** Scrolls the page (viewport) or from a specific element, by a given amount (delta X, delta Y). Can simulate smooth scrolling by splitting it into steps with intermediate pauses. Uses the WebDriver Actions API.
+    - **Parameters:**
+       - `target`: (Optional) The selector of the element to calculate the starting point of the scroll from.
+       - `value`: Specifies the movement (delta) and optionally steps and interval. Format: "DeltaX,DeltaY[,NumberSteps,IntervalMs]".
+       - `x`, `y`: (Optional) Absolute X, Y coordinates in the viewport to start scrolling from.
+       - `offsetX`, `offsetY`: (Optional) Offset in pixels to add to the starting coordinates.
+
+43. **scrollTo**
+    - **Description:** Scrolls the page so that a specific point *within* a target element becomes visible in the viewport. Can simulate smooth scrolling. Uses the WebDriver Actions API.
+    - **Parameters:**
+       - `target`: (Optional) The selector of the target element to scroll towards.
+       - `value`: Specifies coordinates *relative to the top-left corner of the target element* and optionally steps and interval. Format: "TargetX,TargetY[,NumberSteps,IntervalMs]".
+
+### Category: Advanced Custom (webautoma)
+
+44. **otp**
+    - **Description:** Retrieves a One-Time Password (OTP) from an email account. Connects to the specified IMAP server, searches for the most recent email matching criteria, extracts the OTP via a regular expression, and stores it internally. Accessible as `{{.otp}}`.
+    - **Parameters:**
+       - `target`: IMAP connection string. Format: `protocol[authMode]://user:password@server:port`
+       - `value`: Configuration string for search and extraction, parameters separated by `|||`. Format: `"SubjectRegExp|||BodyRegExpWithOTPCaptureGroup[|||CheckIntervalSec[|||MaxEmailAgeMin]]"`
+
+### Category: Debug and Meta-Commands (Custom webautoma)
+
+45. **disableError**
+    - **Description:** Temporarily disables execution interruption in case of errors in subsequent commands. Error will still be logged. Use `enableError` to restore normal behavior.
+
+46. **enableError**
+    - **Description:** Re-enables execution interruption in case of an error, canceling the effect of a previous `disableError`. This is the default behavior.
+
+47. **disableDebug**
+    - **Description:** Disables detailed log output (debug level) generated by the `webautoma` adapter during execution.
+
+48. **enableDebug**
+    - **Description:** Re-enables detailed log output (debug level).
+
+49. **status**
+    - **Description:** Requests and prints WebDriver server status information (version, OS, availability) to the console.
+
+50. **execId**
+    - **Description:** Sets a global identifier for the entire current execution. This ID will be included in generated JSON logs.
+    - **Parameters:**
+       - `target`: The string to use as the execution ID.
+
+51. **probe**
+    - **Description:** Sets an identifier for the "probe" or specific test instance currently running. Included in JSON logs.
+    - **Parameters:**
+       - `target`: The string to use as the probe/instance ID.
+
+52. **setTimeout**
+    - **Description:** Sets the maximum time (implicit timeout) in milliseconds the WebDriver will wait when searching for an element before returning an error.
+    - **Parameters:**
+       - `target`: The wait time in milliseconds.
+
+53. **activeElement** (Debug)
+    - **Description:** Identifies the currently active element (the one with focus) and prints its details to the console.
+
+54. **pageSource** (Debug)
+    - **Description:** Retrieves the entire HTML source of the currently displayed page and prints it to the console.
+
+55. **noop**
+    - **Description:** "No Operation" command. Performs no action. Can be used as a placeholder or to insert comments in the `.side` file.
+
+## Target/Selectors Syntax
+
+(Placeholder: Detailed description of supported target formats: id=, css=, xpath=, linkText=, name=, class=)
+
+## Value/Variables Syntax
+
+(Placeholder: Explanation of using value and `{{.variableName}}` templating to insert dynamic values)
+
+## Interactive Console (SAM)
+
+(Placeholder: Description of the SAM console, how to start it, available commands, usage for debugging)
+
+## Server Mode
+
+(Placeholder: Description of server mode, how to start it, APIs, purpose)
+
+## Advanced Features
+
+(Placeholder: Details on email OTP, advanced configuration, capabilities management, network event capture, etc.)
+
+## Troubleshooting
+
+(Placeholder: Common errors, interpreting logs, known issues)
