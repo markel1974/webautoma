@@ -8,3 +8,4 @@ src/server/web/ui/react/yarn.lock
 /src/server/web/content.go
 /src/server/web/ui/react/dist/
 .idea/
+.junie/
