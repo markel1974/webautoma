@@ -102,4 +102,4 @@ Let's run a simple test that opens Google and performs a search.
     ```
     `webautoma` will attempt to start the ChromeDriver service, run the test, and then stop the service.
 
-You have now successfully installed `webautoma` and executed your first test!
+You have now successfully installed `webautoma` and executed your first test

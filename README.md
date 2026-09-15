@@ -171,9 +171,7 @@ Start `webautoma` with the `-e` flag to enter the Step-Aside-Mode console.
 
 ## Full Documentation
 
-For the most detailed information, including explanations for *all* custom commands and advanced configurations, please refer to the `manual.md` file (currently available in Italian).
-
-*(Placeholder: Add sections for Contributing, Development Setup, etc. if needed)*
+For the most detailed information, including explanations for *all* custom commands and advanced configurations, please refer to the `manual.md` file.
 
 ## License
 
