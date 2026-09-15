@@ -2,23 +2,15 @@
 
 ## Introduction
 
-(Placeholder: General description of webautoma, purposes, strengths, requirements)
-
 ## Installation and Quick Start
 
-(Placeholder: Instructions on how to compile/install, WebDriver setup, basic startup example)
-
 ## Basic Usage (.side Execution)
-
-(Placeholder: Explanation of main flags, output format, interpreting logs/images)
 
 ## .side File Format
 
 It is based on the standard Selenium IDE v3 JSON format, with some additional commands and parameters specific to webautoma.
 
 ### General Structure
-
-(Placeholder: Description of the main JSON structure of the .side file: version, name, url, tests, suites...)
 
 ### Command Structure
 
@@ -401,24 +393,14 @@ Here is the list of commands recognized by webautoma:
 
 ## Target/Selectors Syntax
 
-(Placeholder: Detailed description of supported target formats: id=, css=, xpath=, linkText=, name=, class=)
-
 ## Value/Variables Syntax
-
-(Placeholder: Explanation of using value and `{{.variableName}}` templating to insert dynamic values)
 
 ## Interactive Console (SAM)
 
-(Placeholder: Description of the SAM console, how to start it, available commands, usage for debugging)
-
 ## Server Mode
 
-(Placeholder: Description of server mode, how to start it, APIs, purpose)
 
 ## Advanced Features
 
-(Placeholder: Details on email OTP, advanced configuration, capabilities management, network event capture, etc.)
-
 ## Troubleshooting
 
-(Placeholder: Common errors, interpreting logs, known issues)
