@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/markel1974/webautoma/src/email"
-	"github.com/markel1974/webautoma/src/help"
 	"log"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/markel1974/webautoma/src/email"
+	"github.com/markel1974/webautoma/src/help"
 
 	"github.com/markel1974/webautoma/src/executor"
 	"github.com/markel1974/webautoma/src/server"
@@ -24,10 +25,6 @@ import (
 	"github.com/markel1974/webautoma/src/wd/base"
 	"github.com/markel1974/webautoma/src/wd/caps/chrome"
 )
-
-//export GOPRIVATE=github.com/markel1974/webautoma
-//go mod tidy
-//go mod vendor
 
 func createServer(listen string) error {
 	cfg := &config.Config{
@@ -116,29 +113,8 @@ func launch(console bool, wdUrl *url.URL, args []string, sideFile string, result
 	return nil
 }
 
-/*
-func test() {
-	download := executor.NewDownloader(&http.Client{})
-	html := `<html>
-<a href="https://www.w3schools.com">Visit W3Schools</a>
-<a href="https://www.w3schools.com">Visit W3Schools</a>
-<a href="https://www.w3schools.com">Visit W3Schools</a>
-	</html>`
-
-	download.DoRetrieveHref(nil, html, "")
-	os.Exit(0)
-}
-*/
-
 func emailTester() {
-	//Email: dimon.probes@telecomitalia.it
-	//const userId = "***REMOVED***"
-	//const pwd = "***REMOVED***"
-	//const host = "mail.telecomitalia.it:993" // "10.14.252.100:993" //
-	//mode := email.ModeTLS
-	target := "startTLS[plain]://markel@tin.it:Cristiana1976@box.tin.it:143"
-	//target := "tls://***REMOVED***:***REMOVED***@mail.telecomitalia.it:993"
-	//target := "tls://***REMOVED***:***REMOVED***@mail.telecomitalia.it:993"
+	target := "startTLS[plain]://abc@box.tin.it"
 	value := ".+One-Time Password" + "|||" + "([0-9]+) is your One-Time Password to login|||60|||2880"
 	options, err := email.NewOptions(value)
 	if err != nil {
@@ -189,9 +165,6 @@ func manPage(man string) {
 
 // -p 50312 -x slide.side.json
 func main() {
-	//emailTester()
-	//launcher.Start()
-	//os.Exit(-1)
 	var showHelp bool
 	var showVersion bool
 	var sideFile string
