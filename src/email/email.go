@@ -12,7 +12,6 @@ import (
 	"github.com/emersion/go-sasl"
 )
 
-// https://github.com/emersion/go-imap/blob/v2/imapclient/example_test.go
 const oAuthMode = "[oauth]"
 const oAuth2Mode = "[oauth2]"
 
