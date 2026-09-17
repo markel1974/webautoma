@@ -6,29 +6,29 @@ import (
 	"strings"
 )
 
-// Provider fornisce accesso diretto alle stringhe di aiuto predefinite per i comandi.
+// Provider provides direct access to predefined help strings for commands.
 type Provider struct {
-	// Mappa che contiene il testo di aiuto per ogni comando.
-	// Chiave: nome del comando (es. "open", "selectWindow")
-	// Valore: stringa multi-linea con la descrizione, parametri ed esempio.
+	// Map containing help text for each command.
+	// Key: command name (e.g. "open", "selectWindow")
+	// Value: multi-line string with description, parameters and example.
 	commandHelp map[string]string
 }
 
-// NewHelp crea e inizializza un nuovo Provider.
-// Le stringhe di aiuto sono definite direttamente qui.
+// NewHelp creates and initializes a new Provider.
+// Help strings are defined directly here.
 func NewHelp() *Provider {
 	helpMap := make(map[string]string)
 
-	// Popola la mappa con le descrizioni che abbiamo generato
-	// (Uso backtick ` per stringhe multi-linea)
+	// Populate the map with descriptions
+	// (Using backticks ` for multi-line strings)
 
-	// --- Categoria: Navigazione ---
+	// --- Category: Navigation ---
 	helpMap["open"] = `
-        - Descrizione: Apre un URL nel browser o naviga verso un percorso relativo all'URL base corrente.
-        - Parametri:
-          - target: L'URL completo (es. https://google.com) o un percorso relativo (es. /pagina). Se relativo, viene aggiunto all'url base definito nel file .side o all'ultimo URL base noto.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Opens a URL in the browser or navigates to a path relative to the current base URL.
+        - Parameters:
+          - target: The full URL (e.g. https://google.com) or a relative path (e.g. /page). If relative, it is appended to the base URL defined in the .side file or to the last known base URL.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "open",
@@ -37,14 +37,14 @@ func NewHelp() *Provider {
           }
     `
 
-	// --- Categoria: Interazione con Elementi ---
+	// --- Category: Element Interaction ---
 	helpMap["click"] = `
-        - Descrizione: Simula un click del mouse sull'elemento specificato. Attende che l'elemento sia pronto (visibile e abilitato) prima di cliccare.
-        - Parametri:
-          - target: Il selettore dell'elemento da cliccare (es. id=myButton, css=.submit-btn).
-          - value: Non utilizzato.
-          - until: Se impostato a 1 o 2, attende che l'elemento sia pronto prima del click.
-        - Esempio:
+        - Description: Simulates a mouse click on the specified element. Waits for the element to be ready (visible and enabled) before clicking.
+        - Parameters:
+          - target: The selector of the element to click (e.g. id=myButton, css=.submit-btn).
+          - value: Not used.
+          - until: If set to 1 or 2, waits for the element to be ready before clicking.
+        - Example:
           {
             "id": "...",
             "command": "click",
@@ -54,17 +54,17 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["type"] = `
-       - Descrizione: Inserisce del testo in un campo input o textarea. Simula la digitazione carattere per carattere con un piccolo ritardo (vedi humanWait).
-       - Parametri:
-         - target: Il selettore dell'elemento in cui scrivere (es. id=username, name=password).
-         - value: Il testo da inserire. Supporta variabili (es. {{.mioUsername}}).
-         - until: Se impostato a 1 o 2, attende che l'elemento sia pronto prima di scrivere.
-       - Esempio:
+       - Description: Enters text into an input or textarea field. Simulates character-by-character typing with a small delay (see humanWait).
+       - Parameters:
+         - target: The selector of the element to type into (e.g. id=username, name=password).
+         - value: The text to insert. Supports variables (e.g. {{.myUsername}}).
+         - until: If set to 1 or 2, waits for the element to be ready before typing.
+       - Example:
          {
            "id": "...",
            "command": "type",
            "target": "id=searchField",
-           "value": "Testo da cercare"
+           "value": "Text to search"
          }
          {
            "id": "...",
@@ -74,40 +74,40 @@ func NewHelp() *Provider {
          }
     `
 	helpMap["select"] = `
-       - Descrizione: Seleziona un'opzione da un elemento <select> (dropdown) basandosi sul testo visibile dell'opzione (label).
-       - Parametri:
-         - target: Il selettore dell'elemento <select>.
-         - value: La stringa label=Testo Dell'Opzione che identifica l'opzione da selezionare.
-         - until: Se impostato a 1 o 2, attende che l'elemento <select> sia pronto.
-       - Esempio:
+       - Description: Selects an option from a <select> (dropdown) element based on the option's visible text (label).
+       - Parameters:
+         - target: The selector of the <select> element.
+         - value: The string label=Option Text that identifies the option to select.
+         - until: If set to 1 or 2, waits for the <select> element to be ready.
+       - Example:
          {
            "id": "...",
            "command": "select",
            "target": "id=countryDropdown",
-           "value": "label=Italia"
+           "value": "label=Italy"
          }
     `
 
-	// --- Categoria: Gestione Timer (Custom webautoma) ---
+	// --- Category: Timer Management (Custom webautoma) ---
 	helpMap["timerCreate"] = `
-       - Descrizione: Crea e inizializza un nuovo timer, senza farlo partire. Utile per misurare tempi composti da più azioni.
-       - Parametri:
-         - target: L'ID univoco da assegnare al timer (es. loginTime).
-         - value: Una descrizione opzionale per il timer (riportata nei log).
-       - Esempio:
+       - Description: Creates and initializes a new timer, without starting it. Useful for measuring times spanning multiple actions.
+       - Parameters:
+         - target: The unique ID to assign to the timer (e.g. loginTime).
+         - value: An optional description for the timer (reported in logs).
+       - Example:
          {
            "id": "...",
            "command": "timerCreate",
            "target": "pageLoadTimer",
-           "value": "Tempo caricamento pagina iniziale"
+           "value": "Initial page load time"
          }
     `
 	helpMap["timerStart"] = `
-       - Descrizione: Avvia (o riavvia) un timer precedentemente creato con timerCreate. Registra il tempo di inizio.
-       - Parametri:
-         - target: L'ID del timer da avviare.
-         - value: Non utilizzato.
-       - Esempio:
+       - Description: Starts (or restarts) a timer previously created with timerCreate. Records the start time.
+       - Parameters:
+         - target: The ID of the timer to start.
+         - value: Not used.
+       - Example:
          {
            "id": "...",
            "command": "timerStart",
@@ -116,18 +116,18 @@ func NewHelp() *Provider {
          }
     `
 	helpMap["timerStop"] = `
-       - Descrizione: Ferma un timer precedentemente avviato. Registra l'intervallo trascorso dall'ultimo timerStart o timerStop. Se value è "finalize", finalizza il timer e scrive l'evento completo nel log JSON; altrimenti, registra solo l'intervallo parziale.
-       - Parametri:
-         - target: L'ID del timer da fermare.
-         - value: Se impostato a finalize (case-insensitive), finalizza il timer. Altrimenti, non fa nulla di speciale oltre a fermare l'intervallo corrente.
-       - Esempio (Stop parziale):
+       - Description: Stops a previously started timer. Records the interval elapsed since the last timerStart or timerStop. If value is "finalize", it finalizes the timer and writes the complete event to the JSON log; otherwise, it only records the partial interval.
+       - Parameters:
+         - target: The ID of the timer to stop.
+         - value: If set to finalize (case-insensitive), finalizes the timer. Otherwise, does nothing special besides stopping the current interval.
+       - Example (Partial stop):
          {
            "id": "...",
            "command": "timerStop",
            "target": "userActionTimer",
            "value": ""
          }
-       - Esempio (Stop e Finalize):
+       - Example (Stop and Finalize):
          {
            "id": "...",
            "command": "timerStop",
@@ -136,11 +136,11 @@ func NewHelp() *Provider {
          }
     `
 	helpMap["timerFinalize"] = `
-       - Descrizione: Finalizza un timer, calcolando il tempo totale trascorso sommando tutti gli intervalli registrati con timerStop. Scrive l'evento completo nel log JSON. Il timer non può più essere usato dopo la finalizzazione.
-       - Parametri:
-         - target: L'ID del timer da finalizzare.
-         - value: Non utilizzato.
-       - Esempio:
+       - Description: Finalizes a timer, calculating the total elapsed time by summing all intervals recorded with timerStop. Writes the complete event to the JSON log. The timer can no longer be used after finalization.
+       - Parameters:
+         - target: The ID of the timer to finalize.
+         - value: Not used.
+       - Example:
          {
            "id": "...",
            "command": "timerFinalize",
@@ -149,17 +149,17 @@ func NewHelp() *Provider {
          }
     `
 
-	// --- Categoria: Gestione Stack Variabili (Custom webautoma) ---
+	// --- Category: Variable Stack Management (Custom webautoma) ---
 	helpMap["stackAdd"] = `
-       - Descrizione: Trova un elemento, ne estrae alcune proprietà (testo, tag, stato visualizzato/abilitato) e le salva in una mappa interna ("stack") associandole all'ID fornito nel campo id del comando. Utile per memorizzare stati intermedi o valori dinamici.
-       - Parametri:
-         - target: Il selettore dell'elemento da cui estrarre le informazioni.
-         - value: Non utilizzato direttamente.
-         - id: (Campo standard del comando) Importante: Questo id viene usato come chiave per memorizzare le informazioni nello stack.
-         - until: Se impostato a 1, attende che l'elemento sia pronto.
-       - Esempio:
+       - Description: Finds an element, extracts some of its properties (text, tag, displayed/enabled status) and saves them in an internal map ("stack") associating them with the ID provided in the command's id field. Useful for storing intermediate states or dynamic values.
+       - Parameters:
+         - target: The selector of the element to extract information from.
+         - value: Not used directly.
+         - id: (Standard command field) Important: This id is used as the key to store information in the stack.
+         - until: If set to 1, waits for the element to be ready.
+       - Example:
          {
-           "id": "userInfo", // Questo ID sarà la chiave nello stack
+           "id": "userInfo", // This ID will be the key in the stack
            "command": "stackAdd",
            "target": "id=userDetails",
            "value": "",
@@ -167,9 +167,9 @@ func NewHelp() *Provider {
          }
     `
 	helpMap["stackReset"] = `
-        - Descrizione: Cancella completamente lo stack interno delle variabili.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Completely clears the internal variable stack.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "stackReset",
@@ -178,9 +178,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["stackPrint"] = `
-        - Descrizione: Stampa il contenuto corrente dello stack sulla console (output standard) in formato JSON indentato. Utile per debugging.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Prints the current contents of the stack to the console (standard output) in indented JSON format. Useful for debugging.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "stackPrint",
@@ -189,108 +189,108 @@ func NewHelp() *Provider {
           }
     `
 
-	// --- Categoria: Controllo Flusso & Utility ---
+	// --- Category: Flow Control & Utility ---
 	helpMap["jump"] = `
-        - Descrizione: Salta l'esecuzione a un altro comando all'interno dello stesso test, identificato dal suo id. Nota: Questo non è un comando standard Selenium IDE e rende il flusso del test più difficile da seguire nell'IDE stesso.
-        - Parametri:
-          - target: L'id del comando a cui saltare.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Jumps execution to another command within the same test, identified by its id. Note: This is not a standard Selenium IDE command and makes the test flow harder to follow in the IDE itself.
+        - Parameters:
+          - target: The id of the command to jump to.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "jump",
-            "target": "inizioCiclo", // Salta al comando con id "inizioCiclo"
+            "target": "startLoop", // Jumps to command with id "startLoop"
             "value": ""
           }
     `
 	helpMap["pause"] = `
-        - Descrizione: Sospende l'esecuzione per un numero specificato di millisecondi.
-        - Parametri:
-          - target: Il numero di millisecondi per cui sospendere l'esecuzione.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Suspends execution for a specified number of milliseconds.
+        - Parameters:
+          - target: The number of milliseconds to suspend execution for.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "pause",
-            "target": "5000", // Pausa per 5 secondi
+            "target": "5000", // Pause for 5 seconds
             "value": ""
           }
     `
 	helpMap["humanWait"] = `
-        - Descrizione: Introduce una pausa "umana", ovvero una pausa di durata variabile casuale basata su un valore base configurabile (parametro -humanWait o executor.humanWaitBase nel codice). Se viene fornito un valore nel value del comando, usa quello come durata fissa in millisecondi.
-        - Parametri:
-          - target: Non utilizzato.
-          - value: Durata fissa della pausa in millisecondi (opzionale). Se omesso, usa la pausa casuale basata su humanWaitBase.
-        - Esempio (Pausa casuale):
+        - Description: Introduces a "human" pause, i.e., a random variable duration pause based on a configurable base value (-humanWait parameter or executor.humanWaitBase in code). If a value is provided in the command's value, it uses that as a fixed duration in milliseconds.
+        - Parameters:
+          - target: Not used.
+          - value: Fixed duration of the pause in milliseconds (optional). If omitted, uses the random pause based on humanWaitBase.
+        - Example (Random pause):
           {
             "id": "...",
             "command": "humanWait",
             "target": "",
             "value": ""
           }
-        - Esempio (Pausa fissa):
+        - Example (Fixed pause):
           {
             "id": "...",
             "command": "humanWait",
             "target": "",
-            "value": "1500" // Pausa fissa di 1.5 secondi
+            "value": "1500" // Fixed pause of 1.5 seconds
           }
     `
 
-	// --- Categoria: Asserzioni e Verifiche ---
+	// --- Category: Assertions and Verifications ---
 	helpMap["assert"] = `
-        - Descrizione: Verifica che il testo visibile di un elemento corrisponda esattamente al valore fornito. Fallisce se il testo è diverso.
-        - Parametri:
-          - target: Il selettore dell'elemento il cui testo deve essere verificato (es. id=messaggioErrore, css=.risultato).
-          - value: Il testo esatto che ci si aspetta di trovare nell'elemento. Supporta variabili {{.variabile}}.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento sia pronto (visibile e abilitato) prima di effettuare la verifica.
-        - Esempio:
+        - Description: Verifies that the visible text of an element exactly matches the provided value. Fails if the text is different.
+        - Parameters:
+          - target: The selector of the element whose text needs to be verified (e.g. id=errorMessage, css=.result).
+          - value: The exact text expected to be found in the element. Supports variables {{.variable}}.
+          - until: (Optional) If set to 1 or 2, waits for the element to be ready (visible and enabled) before verifying.
+        - Example:
           {
             "id": "...",
             "command": "assert",
             "target": "id=statusMessage",
-            "value": "Operazione completata.",
+            "value": "Operation completed.",
             "until": "1"
           }
     `
 	helpMap["exists"] = `
-        - Descrizione: Verifica che un elemento specificato esista nel DOM e sia pronto (visibile e abilitato) entro il timeout configurato. Fallisce se l'elemento non viene trovato o non diventa pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento da cercare (es. id=confermaPopup, css=button.primary).
-          - value: Non utilizzato.
-          - until: (Opzionale) Se impostato a 1 o 2, attende attivamente che l'elemento esista e sia pronto per la durata del timeout. Se omesso (o 0), verifica solo se l'elemento è presente e pronto nello stato attuale della pagina (meno comune per verifiche robuste).
-        - Esempio:
+        - Description: Verifies that a specified element exists in the DOM and is ready (visible and enabled) within the configured timeout. Fails if the element is not found or does not become ready.
+        - Parameters:
+          - target: The selector of the element to search for (e.g. id=popupConfirm, css=button.primary).
+          - value: Not used.
+          - until: (Optional) If set to 1 or 2, actively waits for the element to exist and be ready for the duration of the timeout. If omitted (or 0), only checks if the element is present and ready in the current page state (less common for robust checks).
+        - Example:
           {
             "id": "...",
             "command": "exists",
             "target": "css=.loading-spinner",
             "value": "",
-            "until": "1" // Attende che lo spinner sia visibile/abilitato
+            "until": "1" // Waits for spinner to be visible/enabled
           }
     `
 	helpMap["until"] = `
-        - Descrizione: Attende fino a quando un elemento specificato *non* è più presente o *non* è più pronto (visibile/abilitato) sulla pagina, oppure fino allo scadere del timeout. Utile per aspettare la scomparsa di elementi temporanei (es. messaggi di caricamento). Fallisce se l'elemento rimane presente e pronto alla fine del timeout.
-        - Parametri:
-          - target: Il selettore dell'elemento da monitorare per la sua scomparsa o inattività.
-          - value: Non utilizzato.
-          - until: (Opzionale, ma **consigliato impostarlo a 1** per questo comando) Se 1, attende che l'elemento *non* sia pronto/presente. Se 0 o 2, attende che sia pronto, ma il comando fallirà se l'elemento *è* effettivamente pronto (uso meno intuitivo).
-        - Esempio:
+        - Description: Waits until a specified element is *no longer* present or *no longer* ready (visible/enabled) on the page, or until the timeout expires. Useful for waiting for temporary elements (e.g. loading messages) to disappear. Fails if the element remains present and ready at the end of the timeout.
+        - Parameters:
+          - target: The selector of the element to monitor for its disappearance or inactivity.
+          - value: Not used.
+          - until: (Optional, but **recommended to set to 1** for this command) If 1, waits for the element to *not* be ready/present. If 0 or 2, waits for it to be ready, but the command will fail if the element *is* actually ready (less intuitive usage).
+        - Example:
           {
             "id": "...",
             "command": "until",
             "target": "css=.loading-indicator",
             "value": "",
-            "until": "1" // Attende che l'indicatore di caricamento scompaia o diventi non pronto
+            "until": "1" // Waits for loading indicator to disappear or become not ready
           }
     `
 
-	// --- Categoria: Gestione Finestre/Frame/Alert ---
+	// --- Category: Window/Frame/Alert Management ---
 	helpMap["setWindowSize"] = `
-        - Descrizione: Ridimensiona la finestra corrente alle dimensioni specificate.
-        - Parametri:
-          - target: La dimensione desiderata nel formato "LarghezzaxAltezza" (es. "1280x720").
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Resizes the current window to the specified dimensions.
+        - Parameters:
+          - target: The desired size in "WidthxHeight" format (e.g. "1280x720").
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "setWindowSize",
@@ -299,25 +299,25 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["selectWindow"] = `
-        - Descrizione: Sposta il focus del driver su una finestra o tab specifico. Può usare l'handle diretto del WebDriver, un nome assegnato precedentemente con storeWindowHandle (usando la sintassi ${nomeHandle}), o un indice numerico (meno comune/affidabile).
-        - Parametri:
-          - target: L'identificatore della finestra. Formati possibili:
-              - handle=NOME_HANDLE_WEBDRIVER (raramente usato manualmente)
-              - ${nomeHandleSalvato} (nome assegnato con storeWindowHandle)
-              - Potenzialmente un indice numerico (da verificare nel codice WebDriver)
-          - value: Non utilizzato.
-        - Esempio (usando un handle salvato):
+        - Description: Moves the driver focus to a specific window or tab. Can use the direct WebDriver handle, a name previously assigned with storeWindowHandle (using the ${handleName} syntax), or a numeric index (less common/reliable).
+        - Parameters:
+          - target: The window identifier. Possible formats:
+              - handle=WEBDRIVER_HANDLE_NAME (rarely used manually)
+              - ${savedHandleName} (name assigned with storeWindowHandle)
+              - Potentially a numeric index (to verify in WebDriver code)
+          - value: Not used.
+        - Example (using a saved handle):
           {
             "id": "...",
             "command": "selectWindow",
-            "target": "${finestraPrincipale}",
+            "target": "${mainWindow}",
             "value": ""
           }
     `
 	helpMap["selectWindowMain"] = `
-        - Descrizione: Riporta il focus sulla finestra principale/iniziale (quella aperta all'avvio o impostata con setWindowMain).
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Brings focus back to the main/initial window (the one opened at startup or set with setWindowMain).
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "selectWindowMain",
@@ -326,32 +326,32 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["selectWindowTitle"] = `
-        - Descrizione: Sposta il focus sulla prima finestra/tab il cui titolo corrisponde (parzialmente, esattamente, o tramite regex) al value specificato.
-        - Parametri:
-          - target: Modalità di confronto del titolo (Opzionale, default: contains):
-              - contains: Il titolo della finestra contiene value (case-insensitive).
-              - exact: Il titolo della finestra è esattamente value.
-              - regexp: Il titolo della finestra matcha l'espressione regolare in value.
-          - value: Il testo del titolo (o l'espressione regolare) da cercare.
-        - Esempio (Contains):
+        - Description: Moves focus to the first window/tab whose title matches (partially, exactly, or via regex) the specified value.
+        - Parameters:
+          - target: Title matching mode (Optional, default: contains):
+              - contains: The window title contains value (case-insensitive).
+              - exact: The window title is exactly value.
+              - regexp: The window title matches the regular expression in value.
+          - value: The title text (or regular expression) to search for.
+        - Example (Contains):
           {
             "id": "...",
             "command": "selectWindowTitle",
-            "target": "contains", // o omesso
-            "value": "Pagina Risultati"
+            "target": "contains", // or omitted
+            "value": "Results Page"
           }
-        - Esempio (Regexp):
+        - Example (Regexp):
           {
             "id": "...",
             "command": "selectWindowTitle",
             "target": "regexp",
-            "value": "^Carrello \\(\\d+\\)$" // Es: Titolo "Carrello (3)"
+            "value": "^Cart \\(\\d+\\)$" // E.g.: Title "Cart (3)"
           }
     `
 	helpMap["closeWindow"] = `
-        - Descrizione: Chiude la finestra o il tab *attualmente* in focus. Non può chiudere la finestra principale/iniziale. Dopo la chiusura, il focus *non* viene spostato automaticamente; usare selectWindowMain o un altro comando selectWindow* se necessario.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Closes the window or tab *currently* in focus. Cannot close the main/initial window. After closing, focus is *not* automatically moved; use selectWindowMain or another selectWindow* command if necessary.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "closeWindow",
@@ -360,32 +360,32 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["storeWindowHandle"] = `
-        - Descrizione: Salva l'handle della finestra attualmente in focus associandolo a un nome simbolico. Questo nome può essere usato successivamente in selectWindow o close con la sintassi ${nomeHandle}.
-        - Parametri:
-          - target: Il nome da assegnare all'handle della finestra corrente (es. finestraLogin, popupDettaglio).
-          - value: Non utilizzato.
-        - Campi Specifici: Può utilizzare windowHandleName (ridondante?), windowTimeout, opensWindow per gestire l'attesa dell'apertura di una nuova finestra prima di salvarne l'handle (se opensWindow è true).
-        - Esempio (Salvataggio handle corrente):
+        - Description: Saves the handle of the currently focused window, associating it with a symbolic name. This name can be used subsequently in selectWindow or close with the ${handleName} syntax.
+        - Parameters:
+          - target: The name to assign to the current window handle (e.g. loginWindow, detailPopup).
+          - value: Not used.
+        - Specific Fields: Can use windowHandleName (redundant?), windowTimeout, opensWindow to handle waiting for a new window to open before saving its handle (if opensWindow is true).
+        - Example (Saving current handle):
           {
             "id": "...",
             "command": "storeWindowHandle",
-            "target": "mainWindow", // Salva l'handle corrente come "mainWindow"
+            "target": "mainWindow", // Saves current handle as "mainWindow"
             "value": ""
           }
-        - Esempio (Attesa e salvataggio popup):
+        - Example (Waiting for and saving popup):
           {
             "id": "...",
             "command": "storeWindowHandle",
-            "target": "finestraPopup",
+            "target": "popupWindow",
             "value": "",
             "opensWindow": true,
-            "windowTimeout": 5000 // Attende fino a 5s che appaia una nuova finestra
+            "windowTimeout": 5000 // Waits up to 5s for a new window to appear
           }
     `
 	helpMap["windowHandles"] = `
-        - Descrizione: Stampa sulla console (output standard) l'elenco degli handle di tutte le finestre attualmente aperte. Utile principalmente per debugging.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Prints the list of handles for all currently open windows to the console (standard output). Useful mainly for debugging.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "windowHandles",
@@ -394,22 +394,22 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["close"] = `
-        - Descrizione: Chiude una specifica finestra identificata dal suo handle o da un nome precedentemente salvato con storeWindowHandle. A differenza di closeWindow, questo comando richiede l'identificatore della finestra da chiudere.
-        - Parametri:
-          - target: L'identificatore della finestra da chiudere (es. ${popup}, handle=HANDLE_ID).
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Closes a specific window identified by its handle or by a name previously saved with storeWindowHandle. Unlike closeWindow, this command requires the identifier of the window to close.
+        - Parameters:
+          - target: The identifier of the window to close (e.g. ${popup}, handle=HANDLE_ID).
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "close",
-            "target": "${finestraDaChiudere}",
+            "target": "${windowToClose}",
             "value": ""
           }
     `
 	helpMap["setWindowMain"] = `
-        - Descrizione: Imposta l'handle della finestra *attualmente* in focus come la nuova finestra "principale" o "root" per webautoma. Utile se il flusso di lavoro si sposta permanentemente su una nuova finestra principale.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Sets the handle of the window *currently* in focus as the new "main" or "root" window for webautoma. Useful if the workflow permanently shifts to a new main window.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "setWindowMain",
@@ -418,23 +418,23 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["selectFrame"] = `
-        - Descrizione: Sposta il focus su un frame (o iframe) all'interno della pagina corrente.
-        - Parametri:
-          - target: Identificatore del frame:
-              - index=N: Indice numerico del frame (base 0).
-              - relative=parent: Passa al frame genitore.
-              - relative=top: Passa al contesto principale della pagina (fuori da tutti i frame).
-              - Stringa: Nome o ID dell'elemento (i)frame.
-              - Vuoto: Resetta al contesto principale della pagina (equivalente a relative=top).
-          - value: Non utilizzato.
-        - Esempio (Per indice):
+        - Description: Moves focus to a frame (or iframe) within the current page.
+        - Parameters:
+          - target: Frame identifier:
+              - index=N: Numeric frame index (0-based).
+              - relative=parent: Switch to parent frame.
+              - relative=top: Switch to top-level page context (outside all frames).
+              - String: Name or ID of the (i)frame element.
+              - Empty: Reset to top-level page context (equivalent to relative=top).
+          - value: Not used.
+        - Example (By index):
           {
             "id": "...",
             "command": "selectFrame",
             "target": "index=0",
             "value": ""
           }
-        - Esempio (Per ID/Nome):
+        - Example (By ID/Name):
           {
             "id": "...",
             "command": "selectFrame",
@@ -443,9 +443,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["selectParentFrame"] = `
-        - Descrizione: Sposta il focus dal frame corrente al suo frame genitore diretto. Equivalente a selectFrame con target=relative=parent.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Moves focus from the current frame to its direct parent frame. Equivalent to selectFrame with target=relative=parent.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "selectParentFrame",
@@ -454,36 +454,36 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["selectAlert"] = `
-        - Descrizione: Gestisce un alert JavaScript (popup alert(), confirm(), prompt()) che appare sulla pagina. Legge il testo dell'alert (per log) e poi lo accetta o lo chiude.
-        - Parametri:
-          - target: Non utilizzato.
-          - value: Determina l'azione:
-              - 1: Accetta l'alert (es. preme "OK" in confirm).
-              - 0 o omesso: Chiude/Annulla l'alert (es. preme "Annulla" in confirm).
-        - Esempio (Accetta):
+        - Description: Handles a JavaScript alert (alert(), confirm(), prompt() popup) that appears on the page. Reads the alert text (for logging) and then accepts or dismisses it.
+        - Parameters:
+          - target: Not used.
+          - value: Determines the action:
+              - 1: Accept alert (e.g. click "OK" in confirm).
+              - 0 or omitted: Dismiss/Cancel alert (e.g. click "Cancel" in confirm).
+        - Example (Accept):
           {
             "id": "...",
             "command": "selectAlert",
             "target": "",
             "value": "1"
           }
-        - Esempio (Chiude):
+        - Example (Dismiss):
           {
             "id": "...",
             "command": "selectAlert",
             "target": "",
-            "value": "0" // o omesso
+            "value": "0" // or omitted
           }
     `
 
-	// --- Categoria: Interazioni Avanzate (Mouse) ---
+	// --- Category: Advanced Interactions (Mouse) ---
 	helpMap["rightClick"] = `
-        - Descrizione: Simula un click con il tasto destro del mouse sull'elemento specificato. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui fare click destro.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
+        - Description: Simulates a right mouse click on the specified element. Waits for the element to be ready.
+        - Parameters:
+          - target: The selector of the element to right-click on.
+          - value: Not used.
+          - until: (Optional) If 1 or 2, waits for the element to be ready.
+        - Example:
           {
             "id": "...",
             "command": "rightClick",
@@ -493,12 +493,12 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["doubleClick"] = `
-        - Descrizione: Simula un doppio click con il tasto sinistro del mouse sull'elemento specificato. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui fare doppio click.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
+        - Description: Simulates a double left mouse click on the specified element. Waits for the element to be ready.
+        - Parameters:
+          - target: The selector of the element to double-click on.
+          - value: Not used.
+          - until: (Optional) If 1 or 2, waits for the element to be ready.
+        - Example:
           {
             "id": "...",
             "command": "doubleClick",
@@ -508,12 +508,12 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["mouseOver"] = `
-        - Descrizione: Sposta il cursore del mouse sopra l'elemento specificato, potenzialmente attivando effetti hover o tooltip. Attende che l'elemento sia pronto.
-        - Parametri:
-          - target: Il selettore dell'elemento su cui spostare il mouse.
-          - value: Non utilizzato.
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
+        - Description: Moves the mouse cursor over the specified element, potentially triggering hover effects or tooltips. Waits for the element to be ready.
+        - Parameters:
+          - target: The selector of the element to move the mouse over.
+          - value: Not used.
+          - until: (Optional) If 1 or 2, waits for the element to be ready.
+        - Example:
           {
             "id": "...",
             "command": "mouseOver",
@@ -523,11 +523,11 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["mouseOut"] = `
-        - Descrizione: Simula l'evento del mouse che esce dall'area dell'elemento specificato. Nota: Nel codice attuale (doMouse), questo comando non sembra eseguire azioni specifiche sul WebDriver.
-        - Parametri:
-          - target: Il selettore dell'elemento da cui il mouse "esce".
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Simulates the mouse leaving the area of the specified element. Note: In the current code (doMouse), this command does not seem to execute specific actions on the WebDriver.
+        - Parameters:
+          - target: The selector of the element the mouse "leaves".
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "mouseOut",
@@ -536,74 +536,74 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["mouseDownAt"] = `
-        - Descrizione: Simula la pressione (senza rilascio) del tasto sinistro del mouse sull'elemento specificato, potenzialmente a coordinate relative. Inizia un'operazione di trascinamento (drag).
-        - Parametri:
-          - target: Il selettore dell'elemento su cui premere il mouse.
-          - value: (Opzionale) Coordinate relative all'angolo in alto a sinistra dell'elemento, formato "X,Y" (es. "10,15"). Se omesso, preme al centro (o default del driver).
-          - until: (Opzionale) Se 1 o 2, attende che l'elemento sia pronto.
-        - Esempio:
+        - Description: Simulates pressing (without releasing) the left mouse button on the specified element, potentially at relative coordinates. Starts a drag operation.
+        - Parameters:
+          - target: The selector of the element to press the mouse on.
+          - value: (Optional) Relative coordinates to the top-left corner of the element, format "X,Y" (e.g. "10,15"). If omitted, presses at the center (or driver default).
+          - until: (Optional) If 1 or 2, waits for the element to be ready.
+        - Example:
           {
             "id": "...",
             "command": "mouseDownAt",
             "target": "id=draggableElement",
-            "value": "5,5", // Premi vicino all'angolo in alto a sinistra
+            "value": "5,5", // Press near top-left corner
             "until": "1"
           }
     `
 	helpMap["mouseMoveAt"] = `
-        - Descrizione: Sposta il mouse mentre il tasto sinistro è tenuto premuto (iniziato con mouseDownAt). Usato per il trascinamento (drag). Richiede un mouseDownAt precedente sullo stesso elemento implicito.
-        - Parametri:
-          - target: (Generalmente ignorato, agisce sull'elemento del mouseDownAt).
-          - value: Coordinate relative all'angolo in alto a sinistra dell'elemento *originale* del mouseDownAt, formato "X,Y". Indica la posizione *a cui* spostare il mouse.
-        - Esempio:
+        - Description: Moves the mouse while the left button is held down (started with mouseDownAt). Used for dragging. Requires a previous mouseDownAt on the same implicit element.
+        - Parameters:
+          - target: (Generally ignored, acts on the mouseDownAt element).
+          - value: Relative coordinates to the top-left corner of the *original* element from mouseDownAt, format "X,Y". Indicates the position *to which* to move the mouse.
+        - Example:
           {
             "id": "...",
             "command": "mouseMoveAt",
-            "target": "", // Target non necessario qui
-            "value": "100,50" // Sposta il mouse a 100px destra, 50px sotto dall'origine del drag
+            "target": "", // Target not needed here
+            "value": "100,50" // Move mouse 100px right, 50px down from drag origin
           }
     `
 	helpMap["mouseMultipleMoveAt"] = `
-        - Descrizione: Simile a mouseMoveAt, ma esegue una sequenza di spostamenti relativi consecutivi mentre il tasto è premuto. Utile per simulare un trascinamento lungo un percorso. Richiede un mouseDownAt precedente.
-        - Parametri:
-          - target: (Generalmente ignorato).
-          - value: Sequenza di coordinate relative *incrementali*, separate da |. Ogni coppia "X,Y" è relativa alla *posizione precedente*. Formato: "dX1,dY1|dX2,dY2|...".
-        - Esempio:
+        - Description: Similar to mouseMoveAt, but executes a sequence of consecutive relative movements while the button is pressed. Useful for simulating dragging along a path. Requires a previous mouseDownAt.
+        - Parameters:
+          - target: (Generally ignored).
+          - value: Sequence of *incremental* relative coordinates, separated by |. Each "X,Y" pair is relative to the *previous position*. Format: "dX1,dY1|dX2,dY2|...".
+        - Example:
           {
             "id": "...",
             "command": "mouseMultipleMoveAt",
             "target": "",
-            "value": "50,0|0,50|-50,0" // Sposta 50px a destra, poi 50px in basso, poi 50px a sinistra
+            "value": "50,0|0,50|-50,0" // Move 50px right, then 50px down, then 50px left
           }
     `
 	helpMap["mouseUpAt"] = `
-        - Descrizione: Simula il rilascio del tasto sinistro del mouse, completando un'operazione di trascinamento (drag and drop). Richiede un mouseDownAt precedente.
-        - Parametri:
-          - target: (Generalmente ignorato, agisce sull'elemento del mouseDownAt).
-          - value: (Opzionale) Coordinate relative all'angolo in alto a sinistra dell'elemento *originale* del mouseDownAt, formato "X,Y". Indica la posizione *finale* in cui rilasciare il mouse. Se omesso, rilascia nella posizione corrente.
-        - Esempio:
+        - Description: Simulates releasing the left mouse button, completing a drag and drop operation. Requires a previous mouseDownAt.
+        - Parameters:
+          - target: (Generally ignored, acts on the mouseDownAt element).
+          - value: (Optional) Relative coordinates to the top-left corner of the *original* element from mouseDownAt, format "X,Y". Indicates the *final* position where to release the mouse. If omitted, releases at the current position.
+        - Example:
           {
             "id": "...",
             "command": "mouseUpAt",
             "target": "",
-            "value": "200,100" // Rilascia il mouse a 200px destra, 100px sotto dall'origine del drag
+            "value": "200,100" // Release mouse 200px right, 100px down from drag origin
           }
     `
 
-	// --- Categoria: Interazioni Avanzate (Tastiera - Custom webautoma) ---
+	// --- Category: Advanced Interactions (Keyboard - Custom webautoma) ---
 	helpMap["actionsSendKeys"] = `
-        - Descrizione: Invia la pressione di un tasto speciale (non alfanumerico) o una sequenza semplice all'elemento attivo nella pagina. Utile per simulare Invio, Tab, Frecce direzionali, ecc.
-        - Parametri:
-          - target: (Generalmente non usato, agisce sull'elemento attivo).
-          - value: Il nome del tasto speciale (es. Enter, Tab, ArrowDown, Control, Alt, Shift, F5, etc. - vedi wd/base/keys.go per la lista completa dei nomi mappati) oppure una sequenza di caratteri semplici. Il mapping cerca KeyFromMapping in base/keys.go per i nomi speciali.
-        - Esempio (Invio):
+        - Description: Sends a special key press (non-alphanumeric) or a simple sequence to the active element on the page. Useful for simulating Enter, Tab, Arrow keys, etc.
+        - Parameters:
+          - target: (Generally not used, acts on the active element).
+          - value: The name of the special key (e.g. Enter, Tab, ArrowDown, Control, Alt, Shift, F5, etc. - see wd/base/keys.go for the full list of mapped names) or a sequence of simple characters. The mapping searches KeyFromMapping in base/keys.go for special names.
+        - Example (Enter):
           {
             "id": "...",
             "command": "actionsSendKeys",
             "target": "",
             "value": "Enter"
           }
-        - Esempio (Freccia Giù):
+        - Example (Down Arrow):
           {
             "id": "...",
             "command": "actionsSendKeys",
@@ -612,21 +612,21 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["keys"] = `
-        - Descrizione: Permette di definire sequenze complesse di interazioni da tastiera, includendo pressione (press), rilascio (release) e pause (pause). Utile per simulare combinazioni di tasti (es. Ctrl+C) o comportamenti specifici.
-        - Parametri:
-          - target: (Opzionale) Selettore dell'elemento a cui inviare gli eventi. Se omesso, invia all'elemento attivo.
-          - value: Stringa formattata che descrive la sequenza, separata da virgola. Ogni elemento è azione:valore.
-              - press:KEY: Simula la pressione di un tasto (es. press:Control, press:c). Usa KeyFromMapping per i tasti speciali.
-              - release:KEY: Simula il rilascio di un tasto (es. release:Control, release:c).
-              - pause:MS: Inserisce una pausa in millisecondi (es. pause:100).
-        - Esempio (Ctrl+A, Ctrl+C):
+        - Description: Allows defining complex sequences of keyboard interactions, including press (press), release (release), and pauses (pause). Useful for simulating key combinations (e.g. Ctrl+C) or specific behaviors.
+        - Parameters:
+          - target: (Optional) Selector of the element to send events to. If omitted, sends to the active element.
+          - value: Formatted string describing the sequence, comma-separated. Each item is action:value.
+              - press:KEY: Simulates pressing a key (e.g. press:Control, press:c). Uses KeyFromMapping for special keys.
+              - release:KEY: Simulates releasing a key (e.g. release:Control, release:c).
+              - pause:MS: Inserts a pause in milliseconds (e.g. pause:100).
+        - Example (Ctrl+A, Ctrl+C):
           {
             "id": "...",
             "command": "keys",
             "target": "id=myTextArea",
             "value": "press:Control,press:a,release:a,pause:50,press:c,release:c,release:Control"
           }
-        - Esempio (Scrivere "test" tenendo premuto Shift):
+        - Example (Type "test" while holding Shift):
           {
             "id": "...",
             "command": "keys",
@@ -635,145 +635,145 @@ func NewHelp() *Provider {
           }
     `
 
-	// --- Categoria: File & Download (Custom webautoma) ---
+	// --- Category: File & Download (Custom webautoma) ---
 	helpMap["download"] = `
-        - Descrizione: Scarica un file direttamente da un URL specificato e lo salva nel percorso locale indicato. Utilizza i cookie di sessione correnti del browser per gestire eventuali autenticazioni richieste dal server per il download.
-        - Parametri:
-          - target: L'URL completo da cui scaricare il file. Se l'URL inizia con '/', viene considerato relativo all'URL base della pagina corrente (ottenuto dall'ultimo comando 'open' o navigazione). Supporta variabili {{.variabile}}.
-          - value: Il percorso completo, incluso il nome del file, dove salvare il file scaricato sul sistema locale (es. /percorso/locale/nomefile.pdf o C:\Download\report.xlsx). Supporta variabili {{.variabile}}.
-        - Esempio:
+        - Description: Downloads a file directly from a specified URL and saves it to the indicated local path. Uses current browser session cookies to handle any authentication required by the server for the download.
+        - Parameters:
+          - target: The full URL to download the file from. If the URL starts with '/', it is considered relative to the current page base URL (obtained from the last 'open' command or navigation). Supports variables {{.variable}}.
+          - value: The full path, including filename, where to save the downloaded file on the local system (e.g. /local/path/filename.pdf or C:\Download\report.xlsx). Supports variables {{.variable}}.
+        - Example:
           {
             "id": "...",
             "command": "download",
-            "target": "https://example.com/resources/documento.zip",
-            "value": "/home/utente/download/archivio.zip"
+            "target": "https://example.com/resources/document.zip",
+            "value": "/home/user/download/archive.zip"
           }
           {
             "id": "...",
             "command": "download",
-            "target": "/api/export?id={{.reportId}}", // Relativo all'URL base
+            "target": "/api/export?id={{.reportId}}", // Relative to base URL
             "value": "report_{{.reportId}}.csv"
           }
     `
 	helpMap["clickDownload"] = `
-        - Descrizione: Trova un elemento sulla pagina (solitamente un link <a>), ne estrae l'URL dall'attributo href, quindi scarica il file da quell'URL nel percorso locale specificato. Utile quando l'URL del download è dinamico o non noto a priori. Utilizza i cookie di sessione correnti.
-        - Parametri:
-          - target: Il selettore dell'elemento (es. link <a>) che contiene l'attributo href con l'URL del file da scaricare.
-          - value: Il percorso completo, incluso il nome del file, dove salvare il file scaricato sul sistema locale. Supporta variabili {{.variabile}}.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento sia pronto prima di tentare di leggerne l'attributo href.
-        - Esempio:
+        - Description: Finds an element on the page (usually an <a> link), extracts the URL from its href attribute, then downloads the file from that URL to the specified local path. Useful when the download URL is dynamic or not known in advance. Uses current session cookies.
+        - Parameters:
+          - target: The selector of the element (e.g. <a> link) containing the href attribute with the URL of the file to download.
+          - value: The full path, including filename, where to save the downloaded file on the local system. Supports variables {{.variable}}.
+          - until: (Optional) If set to 1 or 2, waits for the element to be ready before attempting to read its href attribute.
+        - Example:
           {
             "id": "...",
             "command": "clickDownload",
             "target": "css=a.download-link[data-file='report']",
-            "value": "/tmp/report_scaricato.pdf",
+            "value": "/tmp/downloaded_report.pdf",
             "until": "1"
           }
     `
 
-	// --- Categoria: Scrolling (Custom webautoma) ---
+	// --- Category: Scrolling (Custom webautoma) ---
 	helpMap["scroll"] = `
-        - Descrizione: Esegue uno scroll della pagina (viewport) o a partire da un elemento specifico, di una determinata quantità (delta X, delta Y). Utile per spostare la visuale di una quantità fissa. Può simulare uno scroll fluido suddividendolo in passi con pause intermedie. Utilizza l'Actions API del WebDriver (simulazione rotellina/touchpad).
-        - Parametri:
-          - target: (Opzionale) Il selettore dell'elemento da cui calcolare il punto di partenza dello scroll. Se omesso, lo scroll parte dalle coordinate specificate nei campi x/y del comando (default 0,0) più eventuali offsetX/offsetY.
-          - value: Specifica lo spostamento (delta) e opzionalmente i passi e l'intervallo. Formato: "DeltaX,DeltaY[,NumeroPassi,IntervalloMs]".
-              - DeltaX, DeltaY: Pixel di spostamento orizzontale e verticale (negativi per sinistra/su, positivi per destra/giù).
-              - NumeroPassi: (Opzionale) Numero di passi in cui suddividere lo scroll totale.
-              - IntervalloMs: (Opzionale, richiede NumeroPassi) Millisecondi di pausa tra un passo e l'altro.
-          - x, y: (Opzionali, usati solo se target è omesso) Coordinate X, Y *assolute* nella viewport da cui inizia l'azione di scroll. Default: 0,0.
-          - offsetX, offsetY: (Opzionali) Offset in pixel da aggiungere alle coordinate di partenza (sia quelle x/y sia quelle calcolate dall'elemento target).
-        - Esempio (Scroll viewport di 500px in basso):
+        - Description: Scrolls the page (viewport) or from a specific element by a given amount (delta X, delta Y). Useful for shifting view by a fixed amount. Can simulate smooth scrolling by splitting it into steps with intermediate pauses. Uses the WebDriver Actions API (wheel/touchpad simulation).
+        - Parameters:
+          - target: (Optional) The selector of the element from which to calculate the scroll starting point. If omitted, scroll starts from the coordinates specified in the command's x/y fields (default 0,0) plus any offsetX/offsetY.
+          - value: Specifies the displacement (delta) and optionally steps and interval. Format: "DeltaX,DeltaY[,NumberSteps,IntervalMs]".
+              - DeltaX, DeltaY: Horizontal and vertical shift in pixels (negative for left/up, positive for right/down).
+              - NumberSteps: (Optional) Number of steps to divide the total scroll into.
+              - IntervalMs: (Optional, requires NumberSteps) Milliseconds pause between steps.
+          - x, y: (Optional, used only if target is omitted) Absolute X, Y coordinates in the viewport where the scroll action begins. Default: 0,0.
+          - offsetX, offsetY: (Optional) Offset in pixels to add to starting coordinates (both x/y and those calculated from target element).
+        - Example (Scroll viewport 500px down):
           {
             "id": "...",
             "command": "scroll",
-            "target": "", // Scroll della viewport
+            "target": "", // Viewport scroll
             "value": "0,500"
           }
-        - Esempio (Scroll viewport fluido di 1000px in basso in 10 passi):
+        - Example (Smooth scroll viewport 1000px down in 10 steps):
           {
             "id": "...",
             "command": "scroll",
             "target": "",
-            "value": "0,1000,10,50" // 10 passi, 50ms di pausa tra passi
+            "value": "0,1000,10,50" // 10 steps, 50ms pause between steps
           }
-        - Esempio (Scroll partendo dal basso di un elemento header):
+        - Example (Scroll starting from bottom of a header element):
           {
             "id": "...",
             "command": "scroll",
             "target": "id=mainHeader",
-            "value": "0,300", // Scrolla 300px in basso
-            "offsetY": 50 // Partendo 50px sotto l'header
+            "value": "0,300", // Scroll 300px down
+            "offsetY": 50 // Starting 50px below header
           }
     `
 	helpMap["scrollTo"] = `
-        - Descrizione: Scrolla la pagina in modo che un punto specifico *all'interno* di un elemento target diventi visibile nella viewport. Se l'elemento non è inizialmente visibile, prova prima a portarlo in vista. Può simulare uno scroll fluido. Utilizza l'Actions API del WebDriver.
-        - Parametri:
-          - target: (Opzionale) Il selettore dell'elemento target verso cui scrollare. Se omesso, utilizza l'elemento attualmente attivo (quello con il focus).
-          - value: Specifica le coordinate *relative all'angolo in alto a sinistra dell'elemento target* e opzionalmente i passi e l'intervallo. Formato: "TargetX,TargetY[,NumeroPassi,IntervalloMs]".
-              - TargetX, TargetY: Coordinate X, Y *dentro* l'elemento target che si desidera portare in vista. "0,0" corrisponde all'angolo in alto a sinistra dell'elemento.
-              - NumeroPassi: (Opzionale) Numero di passi per raggiungere la posizione.
-              - IntervalloMs: (Opzionale, richiede NumeroPassi) Millisecondi di pausa tra i passi.
-          - offsetX, offsetY: (Opzionali) Offset in pixel da aggiungere alle coordinate TargetX, TargetY specificate in value.
-          - until: (Opzionale) Se impostato a 1 o 2, attende che l'elemento target sia pronto prima di tentare lo scroll.
-        - Esempio (Scrollare fino all'inizio di un footer):
+        - Description: Scrolls the page so that a specific point *within* a target element becomes visible in the viewport. If the element is not initially visible, it first tries to bring it into view. Can simulate smooth scrolling. Uses the WebDriver Actions API.
+        - Parameters:
+          - target: (Optional) The selector of the target element to scroll towards. If omitted, uses the currently active element (the one with focus).
+          - value: Specifies coordinates *relative to the top-left corner of the target element* and optionally steps and interval. Format: "TargetX,TargetY[,NumberSteps,IntervalMs]".
+              - TargetX, TargetY: X, Y coordinates *inside* the target element to bring into view. "0,0" corresponds to the top-left corner of the element.
+              - NumberSteps: (Optional) Number of steps to reach the position.
+              - IntervalMs: (Optional, requires NumberSteps) Milliseconds pause between steps.
+          - offsetX, offsetY: (Optional) Offset in pixels to add to TargetX, TargetY coordinates specified in value.
+          - until: (Optional) If set to 1 or 2, waits for the target element to be ready before attempting the scroll.
+        - Example (Scroll to top of footer):
           {
             "id": "...",
             "command": "scrollTo",
             "target": "id=pageFooter",
-            "value": "0,0", // Porta l'angolo 0,0 del footer in vista
+            "value": "0,0", // Bring corner 0,0 of footer into view
             "until": "1"
           }
-        - Esempio (Scrollare fluidamente a un punto specifico dentro un div):
+        - Example (Smoothly scroll to a specific point inside a div):
           {
             "id": "...",
             "command": "scrollTo",
             "target": "css=div.scrollable-content",
-            "value": "0,500,10,50" // Porta il punto Y=500 dentro il div in vista, in 10 passi
+            "value": "0,500,10,50" // Bring point Y=500 inside div into view, in 10 steps
           }
     `
 
-	// --- Categoria: Custom Avanzati (webautoma) ---
+	// --- Category: Advanced Custom (webautoma) ---
 	helpMap["otp"] = `
-        - Descrizione: Recupera un One-Time Password (OTP) da un account email. Si connette al server IMAP specificato, cerca l'email più recente che soddisfa i criteri (oggetto, età massima), estrae il codice OTP dal corpo dell'email tramite un'espressione regolare, e lo memorizza internamente. L'OTP recuperato può essere utilizzato nei comandi successivi (ad esempio 'type') usando la variabile {{.otp}}.
-        - Parametri:
-          - target: La stringa di connessione al server IMAP. Formato: protocollo[authMode]://utente:password@server:porta
-              - protocollo: Può essere tls (consigliato), starttls, o insecure.
-              - [authMode]: (Opzionale) Specificare [oauth] o [oauth2] se si utilizza l'autenticazione OAuth/OAuth2 invece della password diretta.
-              - utente: Nome utente per l'accesso IMAP.
-              - password: Password o token OAuth.
-              - server: Indirizzo del server IMAP.
-              - porta: Porta del server IMAP (es. 993 per TLS, 143 per StartTLS/Insecure).
-              - Esempio TLS: tls://mia.email@example.com:LaMiaPassword@imap.example.com:993
-              - Esempio OAuth2: tls[oauth2]://utente@gmail.com:TokenDiAccessoOAuth2@imap.gmail.com:993
-          - value: Stringa di configurazione per la ricerca e l'estrazione, con parametri separati da |||. Formato: "RegExpOggetto|||RegExpCorpoConGruppoDiCatturaOTP[|||IntervalloVerificaSec[|||ValiditaEmailMin]]"
-              - RegExpOggetto: Espressione regolare (Go standard) per identificare l'oggetto dell'email contenente l'OTP (es. ^Codice di verifica.*$).
-              - RegExpCorpoConGruppoDiCatturaOTP: Espressione regolare (Go standard) applicata al corpo dell'email per estrarre l'OTP. **Deve** contenere un gruppo di cattura tra parentesi () che isoli esattamente il codice OTP (es. Il tuo codice OTP è ([0-9]{6})\., cattura 6 cifre).
-              - IntervalloVerificaSec: (Opzionale, default: 60) Numero massimo di secondi durante i quali webautoma tenterà di recuperare l'email (controllando periodicamente la casella).
-              - ValiditaEmailMin: (Opzionale, default: 5) Età massima in minuti che l'email può avere per essere considerata valida.
-        - Risultato: L'OTP estratto viene salvato nella variabile interna otp, accessibile come {{.otp}} nei campi value dei comandi successivi.
-        - Esempio:
+        - Description: Retrieves a One-Time Password (OTP) from an email account. Connects to the specified IMAP server, searches for the most recent email matching the criteria (subject, maximum age), extracts the OTP code from the email body using a regular expression, and stores it internally. The retrieved OTP can be used in subsequent commands (e.g. 'type') using the variable {{.otp}}.
+        - Parameters:
+          - target: Connection string to IMAP server. Format: protocol[authMode]://user:password@server:port
+              - protocol: Can be tls (recommended), starttls, or insecure.
+              - [authMode]: (Optional) Specify [oauth] or [oauth2] if using OAuth/OAuth2 authentication instead of direct password.
+              - user: Username for IMAP login.
+              - password: Password or OAuth token.
+              - server: IMAP server address.
+              - port: IMAP server port (e.g. 993 for TLS, 143 for StartTLS/Insecure).
+              - TLS Example: tls://my.email@example.com:MyPassword@imap.example.com:993
+              - OAuth2 Example: tls[oauth2]://user@gmail.com:OAuth2AccessToken@imap.gmail.com:993
+          - value: Configuration string for search and extraction, with parameters separated by |||. Format: "SubjectRegExp|||BodyRegExpWithOTPCaptureGroup[|||CheckIntervalSec[|||MaxEmailAgeMin]]"
+              - SubjectRegExp: Regular expression (standard Go) to identify the email subject containing the OTP (e.g. ^Verification code.*$).
+              - BodyRegExpWithOTPCaptureGroup: Regular expression (standard Go) applied to the email body to extract the OTP. **Must** contain a capture group in parentheses () that isolates the OTP code exactly (e.g. Your OTP code is ([0-9]{6})\., captures 6 digits).
+              - CheckIntervalSec: (Optional, default: 60) Maximum number of seconds during which webautoma will attempt to retrieve the email (periodically checking the mailbox).
+              - MaxEmailAgeMin: (Optional, default: 5) Maximum age in minutes that the email can have to be considered valid.
+        - Result: The extracted OTP is saved in the internal variable otp, accessible as {{.otp}} in the value fields of subsequent commands.
+        - Example:
           {
-            "id": "recuperaOTP",
+            "id": "retrieveOTP",
             "command": "otp",
-            "target": "tls://utente@example.com:passwordSegreta@imap.example.com:993",
-            "value": "Il tuo codice monouso Esempio Corp|||codice di verifica: ([A-Z0-9]+)|||90|||3"
-            // Cerca email con oggetto "Il tuo codice monouso Esempio Corp"
-            // Estrae un codice alfanumerico dal corpo (es. "codice di verifica: XY78Z1")
-            // Tenta per 90 secondi, email valide se più recenti di 3 minuti
+            "target": "tls://user@example.com:secretPassword@imap.example.com:993",
+            "value": "Your one-time code Example Corp|||verification code: ([A-Z0-9]+)|||90|||3"
+            // Searches email with subject "Your one-time code Example Corp"
+            // Extracts alphanumeric code from body (e.g. "verification code: XY78Z1")
+            // Attempts for 90 seconds, valid emails if newer than 3 minutes
           }
           {
-            "id": "inserisciOTP",
+            "id": "enterOTP",
             "command": "type",
             "target": "id=otpField",
-            "value": "{{.otp}}" // Usa l'OTP recuperato nel passo precedente
+            "value": "{{.otp}}" // Uses the OTP retrieved in previous step
           }
     `
 
-	// --- Categoria: Debug e Meta-Comandi (Custom webautoma) ---
+	// --- Category: Debug and Meta-Commands (Custom webautoma) ---
 	helpMap["disableError"] = `
-        - Descrizione: Disabilita temporaneamente l'interruzione dell'esecuzione in caso di errore nei comandi successivi. Utile per tentare azioni che potrebbero fallire senza bloccare l'intero test. L'errore verrà comunque loggato (a meno che non sia disabilitato anche il debug). Usare enableError per riattivare il comportamento normale.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Temporarily disables execution interruption in case of errors in subsequent commands. Useful for attempting actions that might fail without stopping the entire test. The error will still be logged (unless debug is also disabled). Use enableError to re-enable normal behavior.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "disableError",
@@ -782,9 +782,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["enableError"] = `
-        - Descrizione: Riattiva l'interruzione dell'esecuzione in caso di errore, annullando l'effetto di un precedente disableError. Questo è il comportamento predefinito.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Re-enables execution interruption in case of an error, canceling the effect of a previous disableError. This is the default behavior.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "enableError",
@@ -793,9 +793,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["disableDebug"] = `
-        - Descrizione: Disabilita l'output di log dettagliato (livello debug) generato dall'adapter webautoma durante l'esecuzione.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Disables detailed log output (debug level) generated by the webautoma adapter during execution.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "disableDebug",
@@ -804,9 +804,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["enableDebug"] = `
-        - Descrizione: Riattiva l'output di log dettagliato (livello debug). Utile se è stato precedentemente disabilitato.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Re-enables detailed log output (debug level). Useful if previously disabled.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "enableDebug",
@@ -815,9 +815,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["status"] = `
-        - Descrizione: Richiede e stampa sulla console (output standard) le informazioni di stato del server WebDriver (versione, OS, disponibilità). Utile per diagnosi.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Requests and prints WebDriver server status information (version, OS, availability) to the console (standard output). Useful for diagnosis.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "status",
@@ -826,48 +826,48 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["execId"] = `
-        - Descrizione: Imposta un identificatore globale per l'intera esecuzione corrente. Questo ID verrà incluso nei log JSON generati, utile per correlare eventi di diverse esecuzioni.
-        - Parametri:
-          - target: La stringa da usare come ID dell'esecuzione.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Sets a global identifier for the entire current execution. This ID will be included in generated JSON logs, useful for correlating events across different runs.
+        - Parameters:
+          - target: The string to use as execution ID.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "execId",
-            "target": "run_produzione_sera",
+            "target": "prod_run_evening",
             "value": ""
           }
     `
 	helpMap["probe"] = `
-        - Descrizione: Imposta un identificatore per la "sonda" o istanza specifica del test in corso. Questo ID verrà incluso nei log JSON, utile per distinguere i risultati quando più istanze dello stesso test girano in parallelo o per identificare specifici punti di monitoraggio.
-        - Parametri:
-          - target: La stringa da usare come ID della sonda/istanza.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Sets an identifier for the "probe" or specific instance of the test in progress. This ID will be included in JSON logs, useful for distinguishing results when multiple instances of the same test run in parallel or to identify specific monitoring points.
+        - Parameters:
+          - target: The string to use as probe/instance ID.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "probe",
-            "target": "monitor_login_roma",
+            "target": "monitor_login_rome",
             "value": ""
           }
     `
 	helpMap["setTimeout"] = `
-        - Descrizione: Imposta il tempo massimo (timeout implicito) in millisecondi che il WebDriver attenderà quando cerca un elemento (findElement, findElements) prima di restituire un errore "elemento non trovato".
-        - Parametri:
-          - target: Il tempo di attesa in millisecondi.
-          - value: Non utilizzato.
-        - Esempio:
+        - Description: Sets the maximum time (implicit timeout) in milliseconds that WebDriver will wait when searching for an element (findElement, findElements) before returning an "element not found" error.
+        - Parameters:
+          - target: The wait time in milliseconds.
+          - value: Not used.
+        - Example:
           {
             "id": "...",
             "command": "setTimeout",
-            "target": "30000", // Imposta timeout a 30 secondi
+            "target": "30000", // Sets timeout to 30 seconds
             "value": ""
           }
     `
 	helpMap["activeElement"] = `
-        - Descrizione: Identifica l'elemento attualmente attivo (quello con il focus) nella pagina e ne stampa i dettagli (tag, testo, stato) sulla console (output standard). Utile per debugging per capire dove si trova il focus della tastiera/interazione.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Identifies the currently active element (the one with focus) on the page and prints its details (tag, text, state) to the console (standard output). Useful for debugging to understand where keyboard/interaction focus is.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "activeElement",
@@ -876,9 +876,9 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["pageSource"] = `
-        - Descrizione: Recupera l'intero sorgente HTML della pagina attualmente visualizzata e lo stampa sulla console (output standard). Utile per debugging avanzato della struttura DOM.
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: Retrieves the entire HTML source of the currently displayed page and prints it to the console (standard output). Useful for advanced debugging of DOM structure.
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "pageSource",
@@ -887,38 +887,38 @@ func NewHelp() *Provider {
           }
     `
 	helpMap["noop"] = `
-        - Descrizione: Comando "No Operation". Non esegue alcuna azione. Può essere utile come segnaposto o per inserire commenti nel file .side (usando il campo comment standard di Selenium IDE, sebbene webautoma non lo legga attivamente, può essere utile per chi legge il file).
-        - Parametri: Non ne usa.
-        - Esempio:
+        - Description: "No Operation" command. Performs no action. Can be useful as a placeholder or to insert comments into the .side file (using Selenium IDE standard comment field; although webautoma does not actively read it, it can be useful for anyone reading the file).
+        - Parameters: None used.
+        - Example:
           {
             "id": "...",
             "command": "noop",
             "target": "",
             "value": "",
-            "comment": "Qui inizia la sezione di checkout"
+            "comment": "Checkout section begins here"
           }
     `
 
-	// Aggiungere qui altri comandi se necessario...
+	// Add other commands here if necessary...
 
 	return &Provider{
 		commandHelp: helpMap,
 	}
 }
 
-// GetCommand cerca e restituisce la stringa di aiuto per il comando specificato.
-// Restituisce un errore se il comando non è trovato nella mappa di aiuto.
+// GetCommand searches and returns the help string for the specified command.
+// Returns an error if the command is not found in the help map.
 func (h *Provider) GetCommand(commandName string) (string, error) {
 	helpText, found := h.commandHelp[commandName]
 	if !found {
-		return "", fmt.Errorf("nessun aiuto trovato per il comando: '%s'", commandName)
+		return "", fmt.Errorf("no help found for command: '%s'", commandName)
 	}
-	// Rimuovi spazi bianchi iniziali/finali dal blocco di testo per pulizia
+	// Remove leading/trailing whitespaces from the text block for cleanliness
 	return strings.TrimSpace(helpText), nil
 }
 
-// GetSupportedCommands restituisce un elenco ordinato dei nomi dei comandi
-// per i quali è disponibile l'aiuto.
+// GetSupportedCommands returns a sorted list of command names
+// for which help is available.
 func (h *Provider) GetSupportedCommands() []string {
 	keys := make([]string, 0, len(h.commandHelp))
 	for k := range h.commandHelp {
@@ -950,7 +950,7 @@ func (h *Provider) GetFormatted(commandName string) (string, error) {
 		if len(line) >= minIndent {
 			builder.WriteString(line[minIndent:])
 		} else {
-			builder.WriteString(line) // Mantieni linee vuote o con indentazione minore
+			builder.WriteString(line) // Keep empty lines or lines with smaller indentation
 		}
 		if i < len(lines)-1 {
 			builder.WriteString("\n")
